@@ -1,18 +1,41 @@
-import { documentStore } from "../data/store.js";
 import { askGemini } from "../services/llmService.js";
+import { getVectorStore } from "../services/vectorService.js";
 
 export const askQuestion = async (req, res) => {
-  const { question } = req.body;
+  try {
+    const { question } = req.body;
 
-  const context = documentStore
-    .map((doc) =>
-      doc.chunks.map((chunk) => chunk.text).join(" ")
-    )
-    .join(" ");
+    const vectorStore = getVectorStore();
 
-  const answer = await askGemini(question, context);
+    if (!vectorStore) {
+      return res.status(400).json({
+        message: "Upload document first",
+      });
+    }
 
-  res.json({
-    answer,
-  });
+    const results =
+      await vectorStore.similaritySearch(
+        question,
+        3
+      );
+
+    const context = results
+      .map((doc) => doc.pageContent)
+      .join(" ");
+
+    const answer = await askGemini(
+      question,
+      context
+    );
+
+    res.json({
+      answer,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
 };
