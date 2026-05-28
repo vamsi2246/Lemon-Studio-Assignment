@@ -87,7 +87,21 @@ def generate_rag_response(
             ]
             
             response = model.invoke(messages)
-            answer = response.content
+            
+            # Robust content parsing for list of blocks (common in some langchain-google-genai versions)
+            content = response.content
+            if isinstance(content, list):
+                parts = []
+                for part in content:
+                    if isinstance(part, dict) and "text" in part:
+                        parts.append(part["text"])
+                    elif isinstance(part, str):
+                        parts.append(part)
+                    elif hasattr(part, "text"):
+                        parts.append(part.text)
+                answer = "".join(parts)
+            else:
+                answer = str(content)
             
             latency_ms = (time.time() - start_time) * 1000
             

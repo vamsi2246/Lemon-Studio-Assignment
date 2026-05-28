@@ -156,7 +156,19 @@ async def summarize_document(request: SummaryRequest):
                     SystemMessage(content=system_msg),
                     HumanMessage(content=user_msg)
                 ])
-                summary_content = response.content
+                
+                # Robust response parsing for list of blocks
+                content = response.content
+                if isinstance(content, list):
+                    parts = []
+                    for part in content:
+                        if isinstance(part, dict) and "text" in part:
+                            parts.append(part["text"])
+                        elif isinstance(part, str):
+                            parts.append(part)
+                    summary_content = "".join(parts)
+                else:
+                    summary_content = str(content)
                 break
             except Exception as ex:
                 logger.warning(f"Summarization failed with model {model_name}: {ex}")

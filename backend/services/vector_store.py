@@ -2,6 +2,7 @@ import os
 import shutil
 import json
 import logging
+import time
 from typing import List, Dict, Any, Optional
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
@@ -37,8 +38,9 @@ def save_documents_metadata(metadata: List[Dict[str, Any]]):
 
 def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_size: int) -> int:
     """
-    Creates LangChain Document objects from chunks, adds them to FAISS, and persists the index.
-    Updates the documents metadata json file.
+    Creates LangChain Document objects from chunks, adds them to FAISS in robust rate-limit aware batches,
+    and persists the index. Handles 429 Resource Exhausted rate limits with retries and backoff.
+    Updates the documents metadata JSON log.
     Returns the number of chunks added.
     """
     embeddings_model = get_embeddings_model()
@@ -55,27 +57,56 @@ def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_siz
         for chunk in chunks
     ]
     
-    # Check if vector store already exists
-    if os.path.exists(FAISS_INDEX_PATH) and os.path.exists(os.path.join(FAISS_INDEX_PATH, "index.faiss")):
-        try:
-            logger.info("Loading existing FAISS index to add new documents...")
-            vector_store = FAISS.load_local(
-                FAISS_INDEX_PATH, 
-                embeddings_model, 
-                allow_dangerous_deserialization=True
-            )
-            vector_store.add_documents(documents)
-            vector_store.save_local(FAISS_INDEX_PATH)
-        except Exception as e:
-            logger.error(f"Failed to append to FAISS, creating new: {e}")
-            # If load fails, we can create from scratch
-            vector_store = FAISS.from_documents(documents, embeddings_model)
-            vector_store.save_local(FAISS_INDEX_PATH)
-    else:
-        logger.info("Creating new FAISS index...")
-        vector_store = FAISS.from_documents(documents, embeddings_model)
-        vector_store.save_local(FAISS_INDEX_PATH)
+    # Large files can produce hundreds of chunks, exceeding Gemini embedding minute quotas.
+    # We batch the documents to avoid overloading, and implement retry logic on 429 errors.
+    batch_size = 30
+    total_docs = len(documents)
+    logger.info(f"Indexing '{doc_name}' ({total_docs} chunks total) in batches of {batch_size}...")
+    
+    for idx in range(0, total_docs, batch_size):
+        batch = documents[idx:idx+batch_size]
+        max_retries = 5
         
+        for attempt in range(max_retries):
+            try:
+                # Check if FAISS index files already exist
+                index_exists = (
+                    os.path.exists(FAISS_INDEX_PATH) and 
+                    os.path.exists(os.path.join(FAISS_INDEX_PATH, "index.faiss"))
+                )
+                
+                if not index_exists and idx == 0:
+                    logger.info(f"Creating new FAISS index with batch {idx // batch_size + 1}...")
+                    vector_store = FAISS.from_documents(batch, embeddings_model)
+                else:
+                    logger.info(f"Appending batch {idx // batch_size + 1} to existing FAISS index...")
+                    vector_store = FAISS.load_local(
+                        FAISS_INDEX_PATH, 
+                        embeddings_model, 
+                        allow_dangerous_deserialization=True
+                    )
+                    vector_store.add_documents(batch)
+                
+                # Save immediately to disk
+                vector_store.save_local(FAISS_INDEX_PATH)
+                break # Success! Break the retry loop for this batch.
+                
+            except Exception as e:
+                # Catch Resource Exhausted (429) rate limit issues
+                err_msg = str(e)
+                if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                    sleep_duration = (attempt + 1) * 4
+                    logger.warning(
+                        f"Gemini Rate Limit (429) encountered. Attempt {attempt + 1}/{max_retries}. "
+                        f"Sleeping for {sleep_duration}s before retry..."
+                    )
+                    time.sleep(sleep_duration)
+                else:
+                    logger.error(f"Failed to process batch {idx // batch_size + 1}: {e}")
+                    raise e
+        else:
+            raise RuntimeError(f"Failed to index batch {idx // batch_size + 1} after {max_retries} rate-limit retries.")
+            
     # Update documents metadata
     meta_list = load_documents_metadata()
     # Check if document already exists in metadata
