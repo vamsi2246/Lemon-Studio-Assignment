@@ -109,8 +109,19 @@ def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_siz
             
     # Update documents metadata
     meta_list = load_documents_metadata()
-    # Check if document already exists in metadata
-    meta_list = [m for m in meta_list if m["fileName"] != doc_name]
+    
+    def normalize_name(name: str) -> str:
+        if not name:
+            return ""
+        base = os.path.basename(name).lower()
+        while base.endswith(".pdf.pdf"):
+            base = base[:-4]
+        return base
+        
+    norm_doc_name = normalize_name(doc_name)
+    
+    # Check if document already exists in metadata using normalized name matching
+    meta_list = [m for m in meta_list if normalize_name(m["fileName"]) != norm_doc_name]
     meta_list.append({
         "fileName": doc_name,
         "fileSize": file_size,
@@ -122,15 +133,26 @@ def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_siz
 
 def similarity_search_in_store(query: str, k: int = 4, selected_files: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """
-    Performs similarity search in the FAISS index.
-    Returns chunks with document metadata and normalized similarity scores.
-    Can filter results based on selected_files list.
+    Performs hybrid, query-routed similarity search in the FAISS index with score thresholding.
+    First detects if the query targets specific files based on filename keywords (Query Routing),
+    then filters the FAISS index with robust case/extension-insensitive matching (Metadata-aware),
+    and applies a similarity score threshold to discard low-quality/polluting chunks (Threshold Filtering).
     """
     if not os.path.exists(FAISS_INDEX_PATH) or not os.path.exists(os.path.join(FAISS_INDEX_PATH, "index.faiss")):
         logger.warning("FAISS index does not exist. No documents searched.")
         return []
         
     embeddings_model = get_embeddings_model()
+    
+    # Helper to normalize file names for resilient matching
+    def normalize_name(name: str) -> str:
+        if not name:
+            return ""
+        base = os.path.basename(name).lower()
+        while base.endswith(".pdf.pdf"):
+            base = base[:-4]
+        return base
+
     try:
         vector_store = FAISS.load_local(
             FAISS_INDEX_PATH, 
@@ -138,19 +160,68 @@ def similarity_search_in_store(query: str, k: int = 4, selected_files: Optional[
             allow_dangerous_deserialization=True
         )
         
-        # Prepare callable filter if selected_files list is defined
-        search_filter = None
-        if selected_files:
-            search_filter = lambda m: m.get("source") in selected_files
-            logger.info(f"Filtering search with selected files: {selected_files}")
-            
-        # similarity_search_with_score returns Tuple[Document, float] where float is L2 distance
-        results_with_scores = vector_store.similarity_search_with_score(query, k=k, filter=search_filter)
+        # Load all metadata documents to find which ones are available
+        all_metadata = load_documents_metadata()
+        available_files = [m["fileName"] for m in all_metadata]
         
+        # Determine active files based on selection list
+        active_files = selected_files if selected_files else available_files
+        
+        # 1. QUERY ROUTING: Detect if query explicitly refers to any active document names
+        query_lower = query.lower()
+        routed_files = []
+        for f in active_files:
+            if not f:
+                continue
+            norm_f = normalize_name(f)
+            name_without_ext = norm_f[:-4] if norm_f.endswith(".pdf") else norm_f
+            
+            # Check for direct match
+            if name_without_ext in query_lower or query_lower in name_without_ext:
+                routed_files.append(f)
+                continue
+                
+            # Check for case study numbers specifically (e.g. "case study 4" -> "Case-Study-4-...")
+            digits_in_file = [c for c in name_without_ext if c.isdigit()]
+            if digits_in_file:
+                for d in digits_in_file:
+                    if d in query_lower and ("case" in query_lower or "study" in query_lower or "doc" in query_lower or "paper" in query_lower):
+                        routed_files.append(f)
+                        break
+                if f in routed_files:
+                    continue
+                    
+            # Check for significant keywords
+            cleaned_name = name_without_ext.replace("-", " ").replace("_", " ").replace(":", " ")
+            words = [w for w in cleaned_name.split() if len(w) > 2]
+            matching_words = sum(1 for w in words if w in query_lower and w not in ["pdf", "doc", "vamsi", "kummara"])
+            
+            if matching_words >= 2 or (matching_words >= 1 and any(spec in cleaned_name for spec in ["case", "study", "intersecting", "lines", "habits"])):
+                routed_files.append(f)
+        
+        # Use routed files if detected, otherwise fall back to all active files
+        search_targets = routed_files if routed_files else active_files
+        logger.info(f"Query routing resolved targets: {search_targets} (Original active: {active_files}, Query: '{query}')")
+        
+        # Define the robust metadata filter callable
+        normalized_targets = [normalize_name(f) for f in search_targets if f]
+        search_filter = lambda m: normalize_name(m.get("source", "")) in normalized_targets
+        
+        logger.info(f"Filtering FAISS search using normalized metadata targets: {normalized_targets}")
+        
+        # 2. SEMANTIC RETRIEVAL
+        results_with_scores = vector_store.similarity_search_with_score(query, k=k, filter=search_filter, fetch_k=200)
+        
+        # If routed search returned no chunks, fall back to searching all active files
+        if not results_with_scores and routed_files and active_files != routed_files:
+            logger.warning(f"Routed search on {routed_files} returned no matches. Falling back to all active files: {active_files}")
+            normalized_targets = [normalize_name(f) for f in active_files if f]
+            search_filter = lambda m: normalize_name(m.get("source", "")) in normalized_targets
+            results_with_scores = vector_store.similarity_search_with_score(query, k=k, filter=search_filter, fetch_k=200)
+            
         formatted_results = []
         for doc, distance in results_with_scores:
-            # L2 distance: lower is better (0.0 is perfect match). 
-            # Normalize to 0-1 similarity score: score = 1.0 / (1.0 + distance)
+            # L2 distance normalization (lower is better, 0.0 is perfect)
             similarity = 1.0 / (1.0 + distance)
             
             formatted_results.append({
@@ -160,9 +231,47 @@ def similarity_search_in_store(query: str, k: int = 4, selected_files: Optional[
                 "similarity_score": round(float(similarity), 4)
             })
             
-        return formatted_results
+        # Sort results by similarity score descending (Reranking)
+        formatted_results.sort(key=lambda x: x["similarity_score"], reverse=True)
+        
+        # 3. SCORE THRESHOLD FILTERING
+        # Discard weak matches (L2 distance too large) to prevent context pollution.
+        # But if we have routed files (meaning the user explicitly asked for them), 
+        # we can be more lenient to ensure they get their summary.
+        threshold = 0.54 if routed_files else 0.55
+        filtered_results = [r for r in formatted_results if r["similarity_score"] >= threshold]
+        
+        # If threshold filters out everything but we have matches, keep the top 2 as a safe fallback
+        if not filtered_results and formatted_results:
+            logger.warning("All matches fell below similarity threshold. Keeping top 2 as fallback to prevent empty context.")
+            filtered_results = formatted_results[:2]
+            
+        # Deduplicate chunks to keep context clean
+        seen_texts = set()
+        deduped_results = []
+        for r in filtered_results:
+            cleaned_text = r["text"].strip().lower()
+            if cleaned_text not in seen_texts:
+                seen_texts.add(cleaned_text)
+                deduped_results.append(r)
+                
+        # Limit to top k
+        final_results = deduped_results[:k]
+        
+        # Logs for debugging RAG quality
+        logger.info(f"RAG Retrieval Summary:")
+        logger.info(f"- Query: '{query}'")
+        logger.info(f"- Selected Files: {selected_files}")
+        logger.info(f"- Routed Files: {routed_files}")
+        logger.info(f"- Raw Retrieved Chunks: {len(results_with_scores)}")
+        logger.info(f"- Final Chunks (Threshold/Deduped/Top-k): {len(final_results)}")
+        for idx, chunk in enumerate(final_results):
+            logger.info(f"  [{idx+1}] File: '{chunk['document_name']}' | Page: {chunk['page']} | Score: {chunk['similarity_score']:.4f} | Snippet: {chunk['text'][:80]}...")
+            
+        return final_results
+        
     except Exception as e:
-        logger.error(f"Error performing similarity search: {e}")
+        logger.error(f"Error performing similarity search: {e}", exc_info=True)
         return []
 
 def clear_all_stores():
@@ -189,6 +298,15 @@ def get_document_chunks(doc_name: str) -> List[str]:
         return []
         
     embeddings_model = get_embeddings_model()
+    
+    def normalize_name(name: str) -> str:
+        if not name:
+            return ""
+        base = os.path.basename(name).lower()
+        while base.endswith(".pdf.pdf"):
+            base = base[:-4]
+        return base
+
     try:
         vector_store = FAISS.load_local(
             FAISS_INDEX_PATH, 
@@ -196,12 +314,11 @@ def get_document_chunks(doc_name: str) -> List[str]:
             allow_dangerous_deserialization=True
         )
         
-        # Access docstore to fetch chunks
+        norm_doc_name = normalize_name(doc_name)
         chunks = []
-        # sort by page first if we can, to have ordered summary
-        # we can get the underlying documents
+        
         for doc in vector_store.docstore._dict.values():
-            if doc.metadata.get("source") == doc_name:
+            if normalize_name(doc.metadata.get("source")) == norm_doc_name:
                 chunks.append((doc.metadata.get("page", 0), doc.page_content))
                 
         # Sort by page number to keep reading flow
@@ -221,6 +338,15 @@ def delete_document_from_store(doc_name: str) -> bool:
         return False
         
     embeddings_model = get_embeddings_model()
+    
+    def normalize_name(name: str) -> str:
+        if not name:
+            return ""
+        base = os.path.basename(name).lower()
+        while base.endswith(".pdf.pdf"):
+            base = base[:-4]
+        return base
+
     try:
         vector_store = FAISS.load_local(
             FAISS_INDEX_PATH, 
@@ -228,10 +354,12 @@ def delete_document_from_store(doc_name: str) -> bool:
             allow_dangerous_deserialization=True
         )
         
+        norm_doc_name = normalize_name(doc_name)
+        
         # Find keys to delete
         keys_to_delete = [
             doc_id for doc_id, doc in vector_store.docstore._dict.items()
-            if doc.metadata.get("source") == doc_name
+            if normalize_name(doc.metadata.get("source")) == norm_doc_name
         ]
         
         if not keys_to_delete:

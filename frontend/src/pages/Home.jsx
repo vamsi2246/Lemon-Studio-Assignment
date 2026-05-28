@@ -168,6 +168,8 @@ const Home = () => {
         history: historyPayload,
       };
 
+      console.log("Active selection sent to API:", payload.selected_files);
+
       // Perform a premium fetch reader request to consume the SSE text/event-stream
       const response = await fetch("/api/chat/stream", {
         method: "POST",

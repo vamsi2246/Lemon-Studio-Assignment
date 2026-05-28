@@ -1,7 +1,7 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from typing import List, Dict, Any
 
-def chunk_pdf_pages(pages_data: List[Dict[str, Any]], chunk_size: int = 800, chunk_overlap: int = 100) -> List[Dict[str, Any]]:
+def chunk_pdf_pages(pages_data: List[Dict[str, Any]], chunk_size: int = 600, chunk_overlap: int = 120) -> List[Dict[str, Any]]:
     """
     Chunks a list of pages using LangChain's RecursiveCharacterTextSplitter.
     Preserves page metadata mapping for each chunk.

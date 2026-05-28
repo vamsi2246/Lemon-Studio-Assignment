@@ -5,7 +5,7 @@ import json
 from typing import Dict, Any, List, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from backend.services.vector_store import similarity_search_in_store
+from backend.services.vector_store import similarity_search_in_store, load_documents_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +38,29 @@ def generate_rag_response(
     retrieved_chunks = similarity_search_in_store(question, k=k, selected_files=selected_files)
     
     if not retrieved_chunks:
+        try:
+            registry = load_documents_metadata()
+            total_indexed = len(registry)
+        except Exception:
+            total_indexed = 0
+            
+        selected_count = len(selected_files) if selected_files else total_indexed
+        selected_list_str = ", ".join([f"'{f}'" for f in selected_files]) if selected_files else "All indexed files"
+        
+        diag_msg = (
+            "⚠️ **No retrieval context was found for your query.**\n\n"
+            "**Retrieval Diagnostics**:\n"
+            f"- **Active Sources**: {selected_count} document(s) selected\n"
+            f"- **Selected Filenames**: {selected_list_str}\n"
+            f"- **Total Registry Documents**: {total_indexed} indexed\n"
+            f"- **FAISS Match Count**: 0 chunks retrieved\n\n"
+            "**Recommendations**:\n"
+            "1. Please verify that your selected documents contain text content related to your query.\n"
+            "2. Ensure the documents are checked in the sidebar list.\n"
+            "3. Try selecting all files to expand the semantic search coverage."
+        )
         return {
-            "answer": "No reference context was found. Please ensure you have uploaded documents and selected them as active knowledge sources.",
+            "answer": diag_msg,
             "sources": [],
             "latency_ms": round((time.time() - start_time) * 1000, 2)
         }
@@ -160,8 +181,28 @@ async def generate_rag_response_stream(
     yield f"event: sources\ndata: {json.dumps(retrieved_chunks)}\n\n"
     
     if not retrieved_chunks:
-        token_msg = "No reference context was found. Please ensure you have uploaded documents and selected them as active knowledge sources."
-        yield f"event: token\ndata: {json.dumps(token_msg)}\n\n"
+        try:
+            registry = load_documents_metadata()
+            total_indexed = len(registry)
+        except Exception:
+            total_indexed = 0
+            
+        selected_count = len(selected_files) if selected_files else total_indexed
+        selected_list_str = ", ".join([f"'{f}'" for f in selected_files]) if selected_files else "All indexed files"
+        
+        diag_msg = (
+            "⚠️ **No retrieval context was found for your query.**\n\n"
+            "**Retrieval Diagnostics**:\n"
+            f"- **Active Sources**: {selected_count} document(s) selected\n"
+            f"- **Selected Filenames**: {selected_list_str}\n"
+            f"- **Total Registry Documents**: {total_indexed} indexed\n"
+            f"- **FAISS Match Count**: 0 chunks retrieved\n\n"
+            "**Recommendations**:\n"
+            "1. Please verify that your selected documents contain text content related to your query.\n"
+            "2. Ensure the documents are checked in the sidebar list.\n"
+            "3. Try selecting all files to expand the semantic search coverage."
+        )
+        yield f"event: token\ndata: {json.dumps(diag_msg)}\n\n"
         yield f"event: done\ndata: {json.dumps({'latency_ms': round((time.time() - start_time) * 1000, 2)})}\n\n"
         return
         

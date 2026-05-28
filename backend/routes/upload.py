@@ -52,7 +52,7 @@ async def upload_document(file: UploadFile = File(...)):
             )
             
         # 3. Perform sentence-aware chunking
-        chunks = chunk_pdf_pages(pages_data, chunk_size=800, chunk_overlap=100)
+        chunks = chunk_pdf_pages(pages_data, chunk_size=600, chunk_overlap=120)
         logger.info(f"Generated {len(chunks)} chunks for {file.filename}")
         
         # 4. Generate embeddings and save to FAISS
