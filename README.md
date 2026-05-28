@@ -36,6 +36,13 @@ This platform processes large-scale corporate documents (up to 100MB), segments 
    - Groups matching context fragments under collapsible document parent sections showing page numbers, match scores, and text preview blocks.
    - Executive Popover digests generate detailed briefs for any PDF instantly.
 
+7. **Production-Grade RAG Quality & Gotcha Resolvers**
+   - **Intelligent Pre-Retrieval Query Routing**: Scans user queries for direct document references (e.g. `"summary of case study 4"`), automatically routing and restricting the vector store search *exclusively* to that file. This completely eliminates context pollution from unrelated files.
+   - **FAISS Post-Filtering Gotcha Fix (`fetch_k=200`)**: Solves a major LangChain FAISS post-filtering bug where selective filtering returns `0` results if the target file's chunks do not lie in the global top `k`. Specifying a wide `fetch_k` ensures perfect filtration.
+   - **Resilient Filename Normalization**: Compares and matches document sources in the FAISS index ignoring casing, directory path shapes, and double extensions (`.pdf.pdf` vs `.pdf`).
+   - **Score Thresholding & Deduplication**: Restricts retrieved chunks to highly relevant semantic matches (L2 distance >= 0.54), automatically deduplicating duplicate text segments to keep the context clean and grounded.
+   - **High-Density Markdown RAG Diagnostics**: If retrieval context is empty, the pipeline dynamically generates an interactive diagnostic card inside the chat listing active sources, matched chunks, registry size, and tips to resolve retrieval gaps.
+
 ---
 
 ## 🏗️ Clean Architecture
@@ -145,15 +152,18 @@ FastAPI automatically generates interactive schema specs at:
 
 ## 🚀 Production Deployment Specifications
 
-### 1. Backend: Deploying to Render / Railway
-Render and Railway deploy directly from the provided `backend/Dockerfile` and `backend/render.yaml` spec.
+### 1. Backend: Deploying to Render (Blueprint Orchestration)
+The backend is prepared with a production multi-stage `backend/Dockerfile` and a root-level `render.yaml` Blueprint Infrastructure specification, enabling zero-config deployment.
 
 #### Render.com Steps:
-1. In Render Dashboard, click **New ➔ Blueprint**.
-2. Connect this GitHub repository. Render will automatically parse the `backend/render.yaml` configuration.
-3. It mounts a **Persistent Disk** under `/app/data` to ensure your FAISS vector database persists safely across container restarts.
-4. Input your `GEMINI_API_KEY` in the Environment Variables UI.
-5. Deploy.
+1. In Render Dashboard, click **New ➔ Blueprint** (or Blueprints).
+2. Connect this GitHub repository. Render will automatically parse the root-level `render.yaml` Blueprint configuration.
+3. This Blueprint dynamically orchestrates:
+   - Creating a Docker-based Web Service using `backend/Dockerfile` and setting the context.
+   - Creating and mounting a **Persistent Disk Volume** under `/app/data` to ensure FAISS indices survive container restarts.
+   - Mapping default environment ports and hosting bounds (`PORT=8000`, `HOST=0.0.0.0`).
+4. Paste your `GEMINI_API_KEY` into the dynamic environment variable input inside the Render UI.
+5. Click **Apply** to spin up the infrastructure automatically.
 
 ### 2. Frontend: Deploying to Vercel
 The frontend is configured with Vercel redirects inside `frontend/vercel.json` to handle React client-side route rewrites cleanly.

@@ -1,0 +1,30 @@
+# =========================================================================
+# Render.com Blueprint Infrastructure Specification (render.yaml)
+# =========================================================================
+# This blueprint defines the production services and mounts a persistent disk 
+# volume to retain FAISS indices and document logs across container rebuilds.
+# To deploy, connect this repository to Render and apply this Blueprint spec.
+
+services:
+  - type: web
+    name: lemon-studio-rag-backend
+    env: docker
+    plan: free # Compatible with free tier limits
+    rootDir: backend
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    
+    # Render routes all web traffic to Port 8000 by default (or reads the EXPOSE flag)
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # Recruiter/developer will paste their API key in the Render UI
+      - key: PORT
+        value: 8000
+      - key: HOST
+        value: 0.0.0.0
+
+    # Persist the indexed FAISS vectors and document metadata across deploys
+    disk:
+      name: faiss-storage
+      mountPath: /app/data
+      sizeGB: 1

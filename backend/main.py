@@ -33,17 +33,15 @@ app = FastAPI(
 )
 
 # CORS setup for production (Vercel frontend and local development)
-origins = [
-    "http://localhost:5173",
-    "http://127.0.5173",
-    "http://localhost:3000",
-    "https://*.vercel.app",  # Support wildcards for dynamic Vercel previews
-    "*"  # Wildcard fallback for flexible environments
-]
-
+# To allow credentials with dynamic origins (e.g. Vercel previews), we use allow_origin_regex
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173"
+    ],
+    allow_origin_regex="https://.*\\.vercel\\.app",  # Matches dynamic vercel preview and production subdomains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,6 +76,6 @@ async def health_check():
 if __name__ == "__main__":
     # In production, Render passes the PORT env variable dynamically
     port = int(os.getenv("PORT", 8000))
-    host = os.getenv("HOST", "127.0.0.1")
+    host = os.getenv("HOST", "0.0.0.0")
     logger.info(f"Starting production server on {host}:{port}...")
     uvicorn.run("backend.main:app", host=host, port=port, reload=False)

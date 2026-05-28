@@ -171,7 +171,8 @@ const Home = () => {
       console.log("Active selection sent to API:", payload.selected_files);
 
       // Perform a premium fetch reader request to consume the SSE text/event-stream
-      const response = await fetch("/api/chat/stream", {
+      const apiUrl = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${apiUrl}/api/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
