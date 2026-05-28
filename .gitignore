@@ -18,3 +18,15 @@ yarn-error.log*
 # Operating System files
 .DS_Store
 Thumbs.db
+
+# Python & Virtual Environments
+**/__pycache__/
+*.pyc
+.pytest_cache/
+backend/venv/
+
+# FAISS Vector Store Indexes & Metadata logs
+backend/data/faiss_index/
+backend/data/temp_uploads/
+backend/data/documents.json
+
