@@ -172,3 +172,51 @@ def get_document_chunks(doc_name: str) -> List[str]:
     except Exception as e:
         logger.error(f"Error retrieving chunks for {doc_name}: {e}")
         return []
+
+def delete_document_from_store(doc_name: str) -> bool:
+    """
+    Deletes all chunks associated with a specific document name from the FAISS index.
+    Updates the documents metadata JSON log.
+    If the index becomes empty, purges the local database files.
+    """
+    if not os.path.exists(FAISS_INDEX_PATH) or not os.path.exists(os.path.join(FAISS_INDEX_PATH, "index.faiss")):
+        return False
+        
+    embeddings_model = get_embeddings_model()
+    try:
+        vector_store = FAISS.load_local(
+            FAISS_INDEX_PATH, 
+            embeddings_model, 
+            allow_dangerous_deserialization=True
+        )
+        
+        # Find keys to delete
+        keys_to_delete = [
+            doc_id for doc_id, doc in vector_store.docstore._dict.items()
+            if doc.metadata.get("source") == doc_name
+        ]
+        
+        if not keys_to_delete:
+            logger.warning(f"No vector chunks found to delete for document: {doc_name}")
+            return False
+            
+        logger.info(f"Deleting {len(keys_to_delete)} vector chunks for {doc_name} from FAISS...")
+        
+        # If we are deleting all documents, clear the entire store cleanly
+        meta_list = load_documents_metadata()
+        remaining_meta = [m for m in meta_list if m["fileName"] != doc_name]
+        
+        if not remaining_meta or len(vector_store.docstore._dict) <= len(keys_to_delete):
+            clear_all_stores()
+            logger.info("Vector store emptied and cleared.")
+        else:
+            # Delete and save FAISS
+            vector_store.delete(keys_to_delete)
+            vector_store.save_local(FAISS_INDEX_PATH)
+            save_documents_metadata(remaining_meta)
+            logger.info(f"FAISS index updated. Metadata updated for {len(remaining_meta)} remaining documents.")
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting document {doc_name} from vector store: {e}")
+        return False

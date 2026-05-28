@@ -10,7 +10,8 @@ from backend.services.vector_store import (
     add_documents_to_store, 
     load_documents_metadata, 
     clear_all_stores,
-    get_document_chunks
+    get_document_chunks,
+    delete_document_from_store
 )
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -166,3 +167,22 @@ async def clear_documents():
     except Exception as e:
         logger.error(f"Error resetting database: {e}")
         raise HTTPException(status_code=500, detail="Failed to reset document index.")
+
+@router.delete("/documents/{file_name}")
+async def delete_document(file_name: str):
+    """
+    Deletes a specific document from the vector store index and metadata logs.
+    """
+    try:
+        success = delete_document_from_store(file_name)
+        if not success:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Document '{file_name}' not found or could not be deleted from the index."
+            )
+        return {"message": f"Document '{file_name}' deleted successfully."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error in delete document endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { FileText, ChevronDown, ChevronUp, Check } from "lucide-react";
 
-const Sources = ({ sources }) => {
+const Sources = ({ sources, latency }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
 
   if (!sources || sources.length === 0) return null;
@@ -28,6 +28,11 @@ const Sources = ({ sources }) => {
         <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
           Retrieved Grounding Sources ({sources.length})
         </span>
+        {latency !== undefined && latency > 0 && (
+          <span className="text-[10px] text-zinc-500 font-mono">
+            • Search completed in {latency.toFixed(1)}ms
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-2">

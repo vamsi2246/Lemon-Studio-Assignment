@@ -46,7 +46,7 @@ const Message = ({ message }) => {
 
             {/* Citations / Sources for AI messages */}
             {!isUser && message.sources && message.sources.length > 0 && (
-              <Sources sources={message.sources} />
+              <Sources sources={message.sources} latency={message.latency_ms} />
             )}
           </div>
         </div>

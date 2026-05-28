@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 from typing import Dict, Any, List
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -15,12 +16,14 @@ def generate_rag_response(question: str, k: int = 4) -> Dict[str, Any]:
     3. Generation: Invoke the Gemini model to produce a hallucination-reduced response.
     """
     # 1. Retrieval
+    start_time = time.time()
     retrieved_chunks = similarity_search_in_store(question, k=k)
     
     if not retrieved_chunks:
         return {
             "answer": "Please upload one or more PDF documents first before asking questions.",
-            "sources": []
+            "sources": [],
+            "latency_ms": 0.0
         }
     
     # Construct context from chunks
@@ -69,14 +72,19 @@ def generate_rag_response(question: str, k: int = 4) -> Dict[str, Any]:
         response = model.invoke(messages)
         answer = response.content
         
+        latency_ms = (time.time() - start_time) * 1000
+        
         return {
             "answer": answer,
-            "sources": retrieved_chunks
+            "sources": retrieved_chunks,
+            "latency_ms": round(latency_ms, 2)
         }
         
     except Exception as e:
         logger.error(f"Error in RAG generation: {e}")
+        latency_ms = (time.time() - start_time) * 1000
         return {
             "answer": f"An error occurred while generating the response: {str(e)}",
-            "sources": retrieved_chunks # Still return retrieved sources even if LLM fails
+            "sources": retrieved_chunks, # Still return retrieved sources even if LLM fails
+            "latency_ms": round(latency_ms, 2)
         }

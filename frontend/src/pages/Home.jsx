@@ -70,6 +70,7 @@ const Home = () => {
         role: "ai",
         text: res.data.answer,
         sources: res.data.sources,
+        latency_ms: res.data.latency_ms,
       };
 
       setMessages((prev) => [...prev, aiMsg]);

@@ -57,6 +57,21 @@ const Sidebar = ({
     }
   };
 
+  // Trigger individual PDF Deletion
+  const handleDeleteDoc = async (fileName) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete '${fileName}'? This will remove its chunks from the FAISS vector index.`);
+    if (!confirmDelete) return;
+
+    try {
+      await API.delete(`/documents/${encodeURIComponent(fileName)}`);
+      onUploadSuccess(); // Refresh documents registry list
+      alert(`Document '${fileName}' deleted successfully.`);
+    } catch (error) {
+      console.error("Deletion error:", error);
+      alert(error.response?.data?.detail || `Failed to delete '${fileName}'.`);
+    }
+  };
+
   // Total database chunk counter
   const totalChunks = documents.reduce((sum, doc) => sum + (doc.chunksCount || 0), 0);
 
@@ -90,7 +105,7 @@ const Sidebar = ({
           {documents.length > 0 && (
             <button
               onClick={onClearDocuments}
-              className="text-[10px] flex items-center gap-1 text-rose-400 hover:text-rose-300 font-semibold uppercase tracking-wider py-1 px-2 rounded-md hover:bg-rose-950/20 transition-colors"
+              className="text-[10px] flex items-center gap-1 text-rose-400 hover:text-rose-300 font-semibold uppercase tracking-wider py-1 px-2 rounded-md hover:bg-rose-950/20 transition-colors cursor-pointer"
             >
               <Trash2 className="h-3 w-3" />
               Reset All
@@ -115,7 +130,7 @@ const Sidebar = ({
             documents.map((doc, idx) => (
               <div 
                 key={idx}
-                className="group relative flex items-start gap-3 p-3 bg-zinc-950/30 hover:bg-zinc-900/40 rounded-xl border border-zinc-900 transition-all duration-200"
+                className="group relative flex items-start gap-3 p-3 bg-zinc-950/30 hover:bg-zinc-900/40 rounded-xl border border-zinc-900 transition-all duration-200 font-sans"
               >
                 <div className="h-8.5 w-8.5 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-blue-400 shrink-0 group-hover:border-blue-900/40 group-hover:bg-blue-950/10 transition-colors">
                   <FileCheck className="h-4.5 w-4.5" />
@@ -135,15 +150,26 @@ const Sidebar = ({
                   </div>
                 </div>
 
-                {/* Summarize Quick Action */}
-                <button
-                  onClick={() => handleSummarize(doc.fileName)}
-                  className="h-7 px-2.5 rounded-lg bg-zinc-900 hover:bg-blue-600 text-[10px] text-zinc-300 hover:text-white border border-zinc-800 hover:border-blue-500 font-semibold flex items-center gap-1 shadow-sm shrink-0 self-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200"
-                  title="Summarize with AI"
-                >
-                  <Sparkles className="h-2.5 w-2.5" />
-                  Summary
-                </button>
+                {/* Card hover buttons action list */}
+                <div className="flex items-center gap-1.5 shrink-0 self-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all duration-200">
+                  {/* Summarize Quick Action */}
+                  <button
+                    onClick={() => handleSummarize(doc.fileName)}
+                    className="h-7 px-2 rounded-lg bg-zinc-900 hover:bg-blue-600 text-[10px] text-zinc-300 hover:text-white border border-zinc-800 hover:border-blue-500 font-semibold flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                    title="Summarize with AI"
+                  >
+                    <Sparkles className="h-2.5 w-2.5" />
+                    Summary
+                  </button>
+                  {/* Delete Quick Action */}
+                  <button
+                    onClick={() => handleDeleteDoc(doc.fileName)}
+                    className="h-7 w-7 rounded-lg bg-zinc-900 hover:bg-rose-950/40 hover:text-rose-400 text-zinc-400 border border-zinc-800 hover:border-rose-900/40 flex items-center justify-center shadow-sm transition-colors cursor-pointer"
+                    title="Delete Document"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             ))
           )}
