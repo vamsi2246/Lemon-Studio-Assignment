@@ -92,6 +92,15 @@ class ResilientGeminiEmbeddings(Embeddings):
                 
         # If everything fails, raise a detailed, helpful error
         logger.error(f"CRITICAL: All Gemini embedding models failed. Last error: {last_error}")
+        
+        err_msg_str = str(last_error)
+        if "api key not valid" in err_msg_str.lower() or "api_key_invalid" in err_msg_str.upper() or "not valid" in err_msg_str.lower():
+            raise RuntimeError(
+                "API key not valid. The key configured in your Render environment variables was rejected by Google AI Studio. "
+                "Please verify that you have pasted your active, valid Google AI Studio API key in the Render Dashboard "
+                "and removed any typos or placeholder values (like 'AIzaSyYourActualKeyHere')."
+            )
+            
         raise RuntimeError(
             f"Gemini Embedding Service failed: {last_error}. "
             "Verify your GEMINI_API_KEY is active and has appropriate quota limits."
