@@ -1,123 +1,218 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Sidebar from "../components/Sidebar";
 import Chat from "../components/Chat";
 import API from "../services/api";
 
+// Generate a unique ID for conversations
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
 const Home = () => {
+  // ─── Conversation State ───────────────────────────
+  const [conversations, setConversations] = useState([
+    { id: uid(), title: "New Chat", messages: [], createdAt: Date.now() },
+  ]);
+  const [activeId, setActiveId] = useState(null);
+
+  // ─── Document State ───────────────────────────────
   const [documents, setDocuments] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [loadingDocs, setLoadingDocs] = useState(false);
 
-  // 1. Fetch uploaded documents from the server
+  // ─── Chat State ───────────────────────────────────
+  const [loading, setLoading] = useState(false);
+
+  // ─── Resizable Panel State ────────────────────────
+  const [sidebarWidth, setSidebarWidth] = useState(340);
+  const isResizing = useRef(false);
+  const containerRef = useRef(null);
+
+  // Initialize activeId
+  useEffect(() => {
+    if (!activeId && conversations.length > 0) {
+      setActiveId(conversations[0].id);
+    }
+  }, []);
+
+  // ─── Active Conversation Helper ───────────────────
+  const activeConv = conversations.find((c) => c.id === activeId) || conversations[0];
+  const messages = activeConv?.messages || [];
+
+  // ─── Update messages in the active conversation ───
+  const updateActiveMessages = useCallback((updater) => {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeId ? { ...c, messages: typeof updater === "function" ? updater(c.messages) : updater } : c
+      )
+    );
+  }, [activeId]);
+
+  // ─── Conversation Management ──────────────────────
+  const handleNewChat = () => {
+    const newConv = { id: uid(), title: "New Chat", messages: [], createdAt: Date.now() };
+    setConversations((prev) => [newConv, ...prev]);
+    setActiveId(newConv.id);
+  };
+
+  const handleSwitchConversation = (id) => {
+    setActiveId(id);
+  };
+
+  const handleDeleteConversation = (id) => {
+    setConversations((prev) => {
+      const filtered = prev.filter((c) => c.id !== id);
+      if (filtered.length === 0) {
+        const newConv = { id: uid(), title: "New Chat", messages: [], createdAt: Date.now() };
+        setActiveId(newConv.id);
+        return [newConv];
+      }
+      if (activeId === id) {
+        setActiveId(filtered[0].id);
+      }
+      return filtered;
+    });
+  };
+
+  const handleClearConversation = () => {
+    updateActiveMessages([]);
+    setConversations((prev) =>
+      prev.map((c) => (c.id === activeId ? { ...c, title: "New Chat", messages: [] } : c))
+    );
+  };
+
+  // ─── Document Fetching ────────────────────────────
   const fetchDocuments = async () => {
     try {
       setLoadingDocs(true);
       const res = await API.get("/documents");
       setDocuments(res.data);
     } catch (error) {
-      console.error("Error fetching documents registry:", error);
+      console.error("Error fetching documents:", error);
     } finally {
       setLoadingDocs(false);
     }
   };
 
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
+  useEffect(() => { fetchDocuments(); }, []);
 
-  // 2. Add uploaded document metadata to local registry
-  const handleUploadSuccess = () => {
-    // Re-fetch all documents from backend to ensure we have precise sizes and chunk counts
-    fetchDocuments();
-  };
+  const handleUploadSuccess = () => fetchDocuments();
 
-  // 3. Clear all documents in FAISS index and local database
   const handleClearDocuments = async () => {
-    const confirmClear = window.confirm(
-      "Are you sure you want to clear the entire knowledge index? This will delete all uploaded files and FAISS embeddings."
-    );
-    if (!confirmClear) return;
-
+    if (!window.confirm("Clear entire knowledge index? All documents and embeddings will be deleted.")) return;
     try {
       setLoadingDocs(true);
       await API.post("/clear");
       setDocuments([]);
-      setMessages([]); // Clear chat session as references are deleted
-      alert("System indexes purged successfully.");
     } catch (error) {
       console.error("Error clearing index:", error);
-      alert("Failed to reset system database.");
     } finally {
       setLoadingDocs(false);
     }
   };
 
-  // 4. Submit questions to the RAG chat pipeline
+  // ─── Chat Send ────────────────────────────────────
   const handleSendMessage = async (text) => {
     try {
       setLoading(true);
-
-      // Append user prompt immediately to chat timelines
       const userMsg = { role: "user", text };
-      setMessages((prev) => [...prev, userMsg]);
+      updateActiveMessages((prev) => [...prev, userMsg]);
 
-      // Call FastAPI backend
+      // Auto-title the conversation from first user message
+      if (activeConv.messages.length === 0) {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === activeId ? { ...c, title: text.slice(0, 50) + (text.length > 50 ? "…" : "") } : c))
+        );
+      }
+
       const res = await API.post("/chat", { question: text });
 
-      // Append AI reply with citations
       const aiMsg = {
         role: "ai",
         text: res.data.answer,
         sources: res.data.sources,
         latency_ms: res.data.latency_ms,
       };
-
-      setMessages((prev) => [...prev, aiMsg]);
+      updateActiveMessages((prev) => [...prev, aiMsg]);
     } catch (error) {
-      console.error("RAG pipeline chat failure:", error);
-      
+      console.error("RAG pipeline failure:", error);
       const errorMsg = {
         role: "ai",
-        text: `**Connection Error**: Failed to query the knowledge database. ${
-          error.response?.data?.detail || "Please verify your FastAPI server is online and running."
-        }`,
+        text: `**Error**: ${error.response?.data?.detail || "Failed to reach the AI server."}`,
         sources: [],
       };
-
-      setMessages((prev) => [...prev, errorMsg]);
+      updateActiveMessages((prev) => [...prev, errorMsg]);
     } finally {
       setLoading(false);
     }
   };
 
+  // ─── Resizable Panel Logic ────────────────────────
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const newWidth = Math.min(Math.max(e.clientX - rect.left - 16, 260), 520);
+      setSidebarWidth(newWidth);
+    };
+    const handleMouseUp = () => {
+      isResizing.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  // ─── Render ───────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col font-sans selection:bg-blue-600/30 selection:text-white">
-      {/* Decorative top ambient glow line */}
-      <div className="h-[2px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 w-full" />
-      
-      {/* Dashboard Canvas Container */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-6 p-4 md:p-6 max-h-screen overflow-hidden">
-        
-        {/* Sidebar panel (Uploader, Documents List, System Stats) */}
-        <div className="w-full lg:w-[350px] shrink-0 h-[45vh] lg:h-[calc(100vh-50px)]">
+    <div className="h-screen bg-[#09090b] text-zinc-100 flex flex-col font-sans selection:bg-blue-600/30 selection:text-white overflow-hidden">
+      {/* Ambient gradient top bar */}
+      <div className="h-[2px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 w-full shrink-0" />
+
+      {/* Main workspace container */}
+      <div ref={containerRef} className="flex-1 flex p-3 md:p-4 gap-0 overflow-hidden">
+        {/* ── Sidebar ── */}
+        <div className="shrink-0 h-full" style={{ width: sidebarWidth }}>
           <Sidebar
             documents={documents}
             onUploadSuccess={handleUploadSuccess}
             onClearDocuments={handleClearDocuments}
             loadingDocuments={loadingDocs}
+            conversations={conversations}
+            activeConversationId={activeId}
+            onNewChat={handleNewChat}
+            onSwitchConversation={handleSwitchConversation}
+            onDeleteConversation={handleDeleteConversation}
           />
         </div>
 
-        {/* Chat Area Canvas (Timeline stream, Prompts suggestion, Text Entry field) */}
-        <div className="flex-1 h-[50vh] lg:h-[calc(100vh-50px)]">
+        {/* ── Resizable Drag Handle ── */}
+        <div
+          className={`resize-handle ${isResizing.current ? "active" : ""}`}
+          onMouseDown={handleMouseDown}
+        />
+
+        {/* ── Chat Workspace ── */}
+        <div className="flex-1 h-full min-w-0">
           <Chat
             messages={messages}
             onSendMessage={handleSendMessage}
+            onClearConversation={handleClearConversation}
+            onNewChat={handleNewChat}
             loading={loading}
+            conversationTitle={activeConv?.title}
           />
         </div>
-
       </div>
     </div>
   );
