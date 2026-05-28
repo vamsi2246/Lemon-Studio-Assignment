@@ -10,7 +10,17 @@ from backend.services.embeddings import get_embeddings_model
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+# Resolve the data directory dynamically.
+# If running inside a containerized/deployed environment with a persistent disk mounted at /app/data, use it.
+# Otherwise, fall back to the local data directory relative to the backend workspace.
+CONTAINER_DATA_DIR = "/app/data"
+if os.path.exists(CONTAINER_DATA_DIR) and os.access(CONTAINER_DATA_DIR, os.W_OK):
+    DATA_DIR = CONTAINER_DATA_DIR
+    logger.info(f"Persistent volume detected. Using persistent data directory: {DATA_DIR}")
+else:
+    DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+    logger.info(f"Local environment detected. Using development data directory: {DATA_DIR}")
+
 FAISS_INDEX_PATH = os.path.join(DATA_DIR, "faiss_index")
 METADATA_PATH = os.path.join(DATA_DIR, "documents.json")
 
@@ -102,7 +112,7 @@ def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_siz
                     )
                     time.sleep(sleep_duration)
                 else:
-                    logger.error(f"Failed to process batch {idx // batch_size + 1}: {e}")
+                    logger.error(f"Failed to process batch {idx // batch_size + 1}: {e}", exc_info=True)
                     raise e
         else:
             raise RuntimeError(f"Failed to index batch {idx // batch_size + 1} after {max_retries} rate-limit retries.")

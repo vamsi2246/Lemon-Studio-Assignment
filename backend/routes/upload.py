@@ -11,7 +11,8 @@ from backend.services.vector_store import (
     load_documents_metadata, 
     clear_all_stores,
     get_document_chunks,
-    delete_document_from_store
+    delete_document_from_store,
+    DATA_DIR
 )
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Documents"])
 
-TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "temp_uploads")
+TEMP_DIR = os.path.join(DATA_DIR, "temp_uploads")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 @router.post("/upload")
@@ -117,6 +118,7 @@ async def summarize_document(request: SummaryRequest):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
+        api_key = api_key.strip().strip('"').strip("'")
             
         system_msg = (
             "You are an elite Enterprise AI Search Assistant. Create a highly professional, "

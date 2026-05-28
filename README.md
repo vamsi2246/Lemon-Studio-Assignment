@@ -163,23 +163,23 @@ Lemon Studio implements **production-grade AI engineering gotcha-resolvers** to 
 
 ## 📸 Screenshots & UI Workspace
 
-To maintain a recruiter-grade workspace, place high-resolution screenshots in a root `/screenshots/` directory.
+The following high-fidelity screenshots illustrate the premium, glassmorphic dark-mode interface, structured workspace, and advanced RAG retrieval diagnostics engineered within **Lemon Studio**:
 
-### UI Screens to Capture
-1.  **Dashboard (`dashboard.png`)**: Highlighting the clean, dark-mode cockpit interface, sidebar stats, and dropzone upload UI.
-2.  **Multi-Document Search (`search.png`)**: Highlighting multi-document checklist selections, custom queries, and instant citation highlights with page numbers.
-3.  **AI Context Workspace (`workspace.png`)**: Capturing live streaming responses with typewriter blinking cursors, collapsible citation groups, and summary popovers.
+### 🖥️ 1. Enterprise Dashboard Cockpit
+The core command console features an elite left sidebar showcasing dynamic file selectors, real-time ingestion status indicators, active document statistics, and an elegant drag-and-drop zone.
+![Enterprise Dashboard Cockpit](./screenshots/dashboard.png)
 
-```markdown
-## Dashboard
-![Dashboard](./screenshots/dashboard.png)
+### 📂 2. Sequential Ingestion Progress
+Large corporate manuals are uploaded sequentially, complete with percentage progress trackers, extraction metrics, and background indexation status lights.
+![Ingestion In Progress](./screenshots/upload_workflow.png)
 
-## Multi-Document Search
-![Search](./screenshots/search.png)
+### 💬 3. Conversational AI Workspace
+User queries stream grounded, context-rich responses word-by-word with typewriter styling, collapsible digests, and suggested prompt shortcuts.
+![Conversational AI Workspace](./screenshots/workspace.png)
 
-## AI Context Workspace
-![Workspace](./screenshots/workspace.png)
-```
+### 🔍 4. Semantic Citations & Match Scores
+Retrieved dense vector chunks are grouped under interactive, collapsible document parent files. Page locations and exact mathematical similarity indices are mapped out with pixel-perfect clarity.
+![Semantic Citations and Scores](./screenshots/retrieval_results.png)
 
 ---
 

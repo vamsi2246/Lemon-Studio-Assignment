@@ -31,12 +31,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Verify API key is present at startup
+# Normalize and clean GEMINI_API_KEY globally to handle double quotes or trailing whitespaces from Cloud dashboard setups
 gemini_key = os.getenv("GEMINI_API_KEY")
+if gemini_key:
+    cleaned_key = gemini_key.strip().strip('"').strip("'")
+    if cleaned_key != gemini_key:
+        logger.info("Normalizing GEMINI_API_KEY (removing surrounding quotes or whitespace bounds)...")
+        os.environ["GEMINI_API_KEY"] = cleaned_key
+        gemini_key = cleaned_key
+
+# Verify API key validity and format at startup
 if not gemini_key:
-    logger.warning("CRITICAL: GEMINI_API_KEY environment variable is not defined. AI services will fail.")
+    logger.error("❌ CRITICAL: GEMINI_API_KEY environment variable is not defined. GenAI / RAG pipeline will fail.")
+elif len(gemini_key) < 10 or not gemini_key.startswith("AIzaSy"):
+    logger.error(f"❌ CRITICAL: GEMINI_API_KEY has invalid format (starts with: '{gemini_key[:8]}...'). Expected Google AI Studio format 'AIzaSy...'.")
 else:
-    logger.info("GEMINI_API_KEY loaded successfully.")
+    logger.info(f"✅ GEMINI_API_KEY loaded and validated successfully (format correct, length: {len(gemini_key)}).")
 
 app = FastAPI(
     title="Lemon Studio Enterprise RAG Engine",

@@ -110,6 +110,7 @@ def generate_rag_response(
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set")
+    api_key = api_key.strip().strip('"').strip("'")
         
     last_error = None
     for model_name in GEMINI_MODELS:
@@ -251,6 +252,7 @@ async def generate_rag_response_stream(
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set")
+    api_key = api_key.strip().strip('"').strip("'")
         
     last_error = None
     stream_success = False
