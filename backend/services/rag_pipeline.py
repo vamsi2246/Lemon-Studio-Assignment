@@ -119,6 +119,7 @@ def generate_rag_response(
             model = ChatGoogleGenerativeAI(
                 model=model_name,
                 google_api_key=api_key,
+                transport="rest",
                 temperature=0.2
             )
             
@@ -263,6 +264,7 @@ async def generate_rag_response_stream(
             model = ChatGoogleGenerativeAI(
                 model=model_name,
                 google_api_key=api_key,
+                transport="rest",
                 temperature=0.2
             )
             

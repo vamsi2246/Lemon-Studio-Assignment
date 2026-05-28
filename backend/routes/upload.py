@@ -151,6 +151,7 @@ async def summarize_document(request: SummaryRequest):
                 model = ChatGoogleGenerativeAI(
                     model=model_name,
                     google_api_key=api_key,
+                    transport="rest",
                     temperature=0.3
                 )
                 

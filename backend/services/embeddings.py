@@ -27,9 +27,10 @@ class ResilientGeminiEmbeddings(Embeddings):
         self.api_key = api_key.strip().strip('"').strip("'")
         self.default_model = default_model
         
-        # Centralized SDK configuration
-        genai.configure(api_key=self.api_key)
-        logger.info(f"ResilientGeminiEmbeddings initialized with primary model: {self.default_model}")
+        # Centralized SDK configuration explicitly using standard REST transport
+        # to bypass gRPC blocks or missing system gRPC libraries in containerized hosts
+        genai.configure(api_key=self.api_key, transport="rest")
+        logger.info(f"ResilientGeminiEmbeddings initialized with primary model: {self.default_model} using transport: rest")
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """
