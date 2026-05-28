@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { User, Sparkles, Clock, Copy, Check } from "lucide-react";
 import Sources from "./Sources";
 
-const Message = ({ message }) => {
+const Message = ({ message, isStreaming }) => {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
 
@@ -55,7 +55,7 @@ const Message = ({ message }) => {
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
             ) : (
               <>
-                <div className="markdown-content text-sm leading-relaxed text-zinc-200">
+                <div className={`markdown-content text-sm leading-relaxed text-zinc-200 ${isStreaming ? "streaming-cursor" : ""}`}>
                   <ReactMarkdown>{message.text}</ReactMarkdown>
                 </div>
 

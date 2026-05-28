@@ -134,7 +134,10 @@ const Chat = ({
         ) : (
           messages.map((msg, index) => (
             <div key={index} className="msg-enter">
-              <Message message={msg} />
+              <Message 
+                message={msg} 
+                isStreaming={loading && index === messages.length - 1 && msg.role === "ai"}
+              />
             </div>
           ))
         )}

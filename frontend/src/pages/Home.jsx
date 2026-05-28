@@ -122,56 +122,134 @@ const Home = () => {
     }
   };
 
-  // ─── Chat Send ────────────────────────────────────
+  // ─── Chat Stream Send ─────────────────────────────
   const handleSendMessage = async (text) => {
     try {
       setLoading(true);
       const userMsg = { role: "user", text };
-      updateActiveMessages((prev) => [...prev, userMsg]);
-
+      
       // Auto-title the conversation from first user message
-      if (activeConv.messages.length === 0) {
+      if (messages.length === 0) {
         setConversations((prev) =>
           prev.map((c) => (c.id === activeId ? { ...c, title: text.slice(0, 50) + (text.length > 50 ? "…" : "") } : c))
         );
       }
 
-      // Pass selected_files in request to filter references.
-      // If no documents are selected, warn the user.
+      // Map conversation history memory (last 8 messages for optimal token window)
+      const historyPayload = messages.slice(-8).map((m) => ({
+        role: m.role,
+        text: m.text,
+      }));
+
+      // Append user message and insert a blank placeholder AI message to stream tokens into
+      updateActiveMessages((prev) => [
+        ...prev,
+        userMsg,
+        { role: "ai", text: "", sources: [], latency_ms: 0 }
+      ]);
+
+      // If no documents are active, trigger a visual warning response
       if (documents.length > 0 && selectedDocs.length === 0) {
-        const warningMsg = {
-          role: "ai",
-          text: "⚠️ **No documents are active.** Please check at least one document in the sidebar registry to search or answer questions against.",
-          sources: [],
-          latency_ms: 0
-        };
-        updateActiveMessages((prev) => [...prev, warningMsg]);
+        updateActiveMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === "ai") {
+            last.text = "⚠️ **No documents are active.** Please check at least one document in the sidebar registry to search or answer questions against.";
+          }
+          return next;
+        });
+        setLoading(false);
         return;
       }
 
-      // Restrict query to selected files
       const payload = {
         question: text,
-        selected_files: selectedDocs.length === documents.length ? null : selectedDocs
+        selected_files: selectedDocs.length === documents.length ? null : selectedDocs,
+        history: historyPayload,
       };
 
-      const res = await API.post("/chat", payload);
+      // Perform a premium fetch reader request to consume the SSE text/event-stream
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      const aiMsg = {
-        role: "ai",
-        text: res.data.answer,
-        sources: res.data.sources,
-        latency_ms: res.data.latency_ms,
-      };
-      updateActiveMessages((prev) => [...prev, aiMsg]);
+      if (!response.ok) {
+        throw new Error(`Streaming failed with status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop(); // Retain incomplete buffer parts
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          // Parse SSE Event format: "event: [type]\ndata: [json]"
+          const eventMatch = line.match(/^event:\s*(.+)$/m);
+          const dataMatch = line.match(/^data:\s*(.+)$/m);
+
+          if (eventMatch && dataMatch) {
+            const eventType = eventMatch[1].trim();
+            const rawData = dataMatch[1].trim();
+
+            try {
+              const parsedData = JSON.parse(rawData);
+              
+              if (eventType === "sources") {
+                updateActiveMessages((prev) => {
+                  const next = [...prev];
+                  const last = next[next.length - 1];
+                  if (last && last.role === "ai") {
+                    last.sources = parsedData;
+                  }
+                  return next;
+                });
+              } else if (eventType === "token") {
+                updateActiveMessages((prev) => {
+                  const next = [...prev];
+                  const last = next[next.length - 1];
+                  if (last && last.role === "ai") {
+                    // Instantly append token to the active stream bubble
+                    last.text += parsedData;
+                  }
+                  return next;
+                });
+              } else if (eventType === "done") {
+                updateActiveMessages((prev) => {
+                  const next = [...prev];
+                  const last = next[next.length - 1];
+                  if (last && last.role === "ai") {
+                    last.latency_ms = parsedData.latency_ms;
+                  }
+                  return next;
+                });
+              }
+            } catch (jsonErr) {
+              console.error("Failed to parse SSE event data:", jsonErr);
+            }
+          }
+        }
+      }
     } catch (error) {
-      console.error("RAG pipeline failure:", error);
-      const errorMsg = {
-        role: "ai",
-        text: `**Error**: ${error.response?.data?.detail || "Failed to generate RAG response."}`,
-        sources: [],
-      };
-      updateActiveMessages((prev) => [...prev, errorMsg]);
+      console.error("RAG pipeline streaming failure:", error);
+      updateActiveMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last && last.role === "ai") {
+          last.text = `**Error**: Failed to generate stream response. Ensure the backend is active.`;
+        }
+        return next;
+      });
     } finally {
       setLoading(false);
     }

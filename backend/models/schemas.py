@@ -1,9 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
+class MessageParam(BaseModel):
+    role: str = Field(..., description="The role of the message sender, 'user' or 'ai'")
+    text: str = Field(..., description="The text content of the message")
+
 class QueryRequest(BaseModel):
     question: str = Field(..., description="The user query to retrieve context for and answer")
     selected_files: Optional[List[str]] = Field(default=None, description="Optional list of filenames to restrict the RAG context search")
+    history: Optional[List[MessageParam]] = Field(default=None, description="Optional conversation history for multi-turn contextual memory")
 
 class SourceCitation(BaseModel):
     text: str = Field(..., description="The text content of the retrieved chunk")
