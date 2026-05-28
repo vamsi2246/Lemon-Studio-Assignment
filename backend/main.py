@@ -76,6 +76,16 @@ from backend.routes.query import router as query_router
 app.include_router(upload_router)
 app.include_router(query_router)
 
+@app.get("/")
+@app.head("/")
+async def root_welcome():
+    """Welcome and health endpoint for load balancer port checks."""
+    return {
+        "message": "Lemon Studio Enterprise RAG API is online.",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
+
 @app.get("/api/health")
 async def health_check():
     """Simple API status health check for deployment orchestrators."""
