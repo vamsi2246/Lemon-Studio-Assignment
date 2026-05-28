@@ -1,220 +1,188 @@
-# Enterprise AI Search Assistant (RAG)
+# Lemon Studio · Enterprise RAG Platform
 
-A professional, recruiter-grade Retrieval-Augmented Generation (RAG) system built with **FastAPI**, **React (Vite)**, **FAISS**, **Tailwind CSS v4**, and the **Google Gemini API**. 
+[![Deployment Config: Ready](https://img.shields.io/badge/Deployment-Production--Ready-emerald?style=flat-square)](#🚀-production-deployment-specifications)
+[![API Version: v1.1](https://img.shields.io/badge/API-v1.1--Stable-blue?style=flat-square)](#📡-production-api-documentation)
+[![Technology Stack: FastAPI & React](https://img.shields.io/badge/Stack-FastAPI%20%7C%20React%20%7C%20FAISS-indigo?style=flat-square)](#🏗️-clean-architecture)
 
-This repository implements a modular clean-architecture knowledge discovery engine designed to process multiple PDF files, chunk text semantically, generate vector embeddings, and support context-grounded conversational search with strict hallucination controls and precise source citations.
+A startup-quality, recruiter-grade Enterprise Retrieval-Augmented Generation (RAG) platform built with **FastAPI**, **React (Vite)**, **FAISS**, **Tailwind CSS v4**, and the **Google Gemini API**. 
+
+This platform processes large-scale corporate documents (up to 100MB), segments text semantically, generates vector embeddings with rate-limit backoffs, and supports Server-Sent Events (SSE) streaming chat interactions with precise source-citation highlights and multi-turn contextual conversation memory.
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Capabilities & Features
 
-1. **Multi-Document Registry**:
-   - Seamless Drag & Drop file upload powered by `React Dropzone`.
-   - Real-time indexing progress states (Uploading ➔ Parsing ➔ Embedding ➔ Completed).
-   - Keeps track of indexed document metadata (file names, sizes, chunk counts).
+1. **Server-Sent Events (SSE) Streaming Responses**
+   - Renders word-by-word streaming answers instantly just like ChatGPT and Claude.
+   - Dispatches retrieved citations as isolated events (`event: sources`) immediately so the UI populates sources in milliseconds, followed by incremental tokens (`event: token`).
 
-2. **Advanced PDF Processing & Chunking**:
-   - Reliable multi-page parsing utilizing `PyPDF`.
-   - Sentence-aware character chunking using LangChain's `RecursiveCharacterTextSplitter`.
-   - Embeds chunks using Google Gemini's `models/embedding-001`.
+2. **Context-Aware Turn Memory & Multi-Chat Threads**
+   - Full conversation memory maintains thread context, allowing complex follow-up exchanges.
+   - Manages multiple parallel conversation sessions in the sidebar with dynamic auto-naming.
 
-3. **Persistent Local Vector Indexing**:
-   - Indexed chunks are stored in a persistent local `FAISS` database.
-   - Vector indices are automatically loaded or updated upon document upload (no database cold-start).
-   - Allows purging indices and files instantly with a single "Reset All" command.
+3. **Elite Document Selection & Filtering**
+   - Active registry checkbox selectors allow users to target queries against specific PDFs, multiple PDFs, or search across the entire corporate index.
+   - Prevents unselected queries gracefully with live header badges and warning filters.
 
-4. **Hallucination-Reduced RAG Pipeline**:
-   - Fact-checks questions strictly against retrieved context chunks.
-   - Declines questions gracefully (*"I cannot find the answer in the uploaded documents."*) if the answer is not present in the context.
-   - Yields structured, professional markdown responses (bold text, lists, code snippets).
+4. **100MB PDF Ingestion & Progress Indicators**
+   - Secure sequential file uploading with progressive bytes-to-progress visual trackers.
+   - Extended backend timeouts (3 minutes) and non-memory-blocking streaming writers safely parse large manuals.
 
-5. **Traceable Citations & Metrics**:
-   - Showcases detailed source citations for every AI assertion.
-   - Displays source document filename, page number, and a mathematically normalized relevance/similarity score (e.g. `96.4% match`).
-   - Collapsible citation cards keep the workspace clean.
+5. **Quota-Aware Indexing & Model Fallbacks**
+   - Batches document additions sequentially (groups of 30 chunks) and triggers exponential backoff retries on `RESOURCE_EXHAUSTED` (429) quota boundaries.
+   - Employs zero-downtime Chat model preference loops (`gemini-3.5-flash` ➔ `gemini-2.5-flash` ➔ `gemini-2.0-flash`), eliminating 404 NOT_FOUND API errors.
 
-6. **Instant Document Digests**:
-   - Automatically summarizes long-form documents using a specialized executive RAG pipeline.
-   - Renders summary briefings in a premium, glassmorphic modal with structured key takeaways.
+6. **Grouped Citation UI & Digests**
+   - Groups matching context fragments under collapsible document parent sections showing page numbers, match scores, and text preview blocks.
+   - Executive Popover digests generate detailed briefs for any PDF instantly.
 
 ---
 
 ## 🏗️ Clean Architecture
 
-The project is structured under a strictly separated **Frontend-Backend** architecture to mimic production-ready SaaS platforms:
+The platform strictly segregates concerns under a highly modular structure:
 
 ```
-RAG/
+Lemon-Studio-Assignment/
 ├── backend/
-│   ├── main.py                # FastAPI server entry point and CORS setup
-│   ├── requirements.txt       # Python dependencies (pip)
+│   ├── main.py                # FastAPI entry point, CORS config, & global exception handler
+│   ├── requirements.txt       # Python GenAI dependencies
+│   ├── Dockerfile             # Production multi-stage Docker image
+│   ├── render.yaml            # Render infrastructure specification (disk persistent mounts)
+│   ├── .env.example           # Backend environment blueprint
 │   ├── models/
-│   │   └── schemas.py         # Pydantic schemas (type safety & validation)
+│   │   └── schemas.py         # Pydantic schemas (type contracts & validations)
 │   ├── routes/
-│   │   ├── upload.py          # File upload, list, summary, and purge endpoints
-│   │   └── query.py           # Chat and RAG query processing endpoints
+│   │   ├── upload.py          # File indexation, registry, summary, and delete handlers
+│   │   └── query.py           # Standard and SSE streaming RAG query routers
 │   ├── services/
-│   │   ├── pdf_loader.py      # Extract page text from PDFs via PyPDF
-│   │   ├── chunking.py        # Sentence-aware text character splitting
-│   │   ├── embeddings.py      # Google Gemini vector embeddings model integration
-│   │   ├── vector_store.py    # Local FAISS index lifecycle and similarity query
-│   │   └── rag_pipeline.py    # Prompt construction, grounding, and response generation
-│   └── data/                  # Persistent vector stores and metadata logs (Auto-created)
+│   │   ├── pdf_loader.py      # Page-by-page text parsing via PyPDF
+│   │   ├── chunking.py        # Recursive semantic splitting
+│   │   ├── embeddings.py      # Gemini embedding configuration (embedding-001)
+│   │   ├── vector_store.py    # Persistent FAISS database and rate-limited batching
+│   │   └── rag_pipeline.py    # Prompts, turn memory mapper, and stream generators
+│   └── data/                  # Local vector stores & logs (Excluded from Git)
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Upload.jsx     # File dropzone with indexing feedback loops
-│   │   │   ├── Chat.jsx       # Chat workspace stream & auto-scroll actions
-│   │   │   ├── Message.jsx    # Sleek chat bubble with ReactMarkdown rendering
-│   │   │   ├── Sources.jsx    # Interactive, collapsible source citations
-│   │   │   └── Sidebar.jsx    # Management cockpit (Uploader, Doc Registry, Stats)
-│   │   ├── services/
-│   │   │   └── api.js         # Axios HTTP service wrapper
+│   │   │   ├── Upload.jsx     # Dropzone with progressive upload trackers
+│   │   │   ├── Chat.jsx       # Chat workspace cockpit with suggested prompt widgets
+│   │   │   ├── Message.jsx    # Typewriter streaming cursors & copy hooks
+│   │   │   ├── Sources.jsx    # Grouped collapsible document citations
+│   │   │   └── Sidebar.jsx    # Cockpit, checklist switches, summaries, and stats
 │   │   ├── pages/
-│   │   │   └── Home.jsx       # Page state coordinator
-│   │   ├── App.jsx            # Main app canvas
-│   │   ├── main.jsx           # App mounting point
-│   │   └── index.css          # Tailwind CSS v4 styling definitions
-│   └── vite.config.js         # Vite configuration with proxy settings
+│   │   │   └── Home.jsx       # State coordinator (Stream reader & memory stack)
+│   │   ├── services/
+│   │   │   └── api.js         # Client axios client config
+│   │   └── index.css          # Typewriter cursors, scrollbars, & animations
+│   ├── index.html             # SEO meta and Outfit/Inter fonts
+│   ├── vite.config.js         # Proxy endpoint setups
+│   └── vercel.json            # Vercel SPA edge routing configurations
 │
-└── README.md                  # System instruction handbook
+└── .env.example               # Root configuration blueprint
 ```
 
 ---
 
-## 🔄 RAG Workflow Engine
+## 🔄 RAG Event & Memory Engine
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Corporate User
+    actor User as Enterprise User
     participant FE as React Frontend
     participant BE as FastAPI Backend
     participant VS as FAISS Vector Store
     participant AI as Gemini API
 
-    Note over User,FE: 1. Knowledge Ingestion
-    User->>FE: Drags & drops PDF files
-    FE->>BE: POST /api/upload
-    BE->>BE: Parse PDF pages (PyPDF)
-    BE->>BE: Chunk text semantically (LangChain)
-    BE->>AI: Vectorize chunks (embedding-001)
-    BE->>VS: Save vector index to disk (FAISS)
-    BE-->>FE: Return indexing receipt (JSON)
+    Note over User,FE: 1. Document Ingestion
+    User->>FE: Ingests 100MB PDF
+    FE->>BE: POST /api/upload (Extended Timeout)
+    BE->>BE: Parse text page-by-page (PyPDF)
+    BE->>BE: Generate sentence-aware splits
+    BE->>VS: Save chunks in 30-chunk batches (Quota retry checks)
+    VS-->>FE: Return success metadata
+    FE->>User: Renders checkable document card
 
     Note over User,FE: 2. Conversational Interrogation
-    User->>FE: Submits question ("Are there core architectural risks?")
-    FE->>BE: POST /api/chat { question }
-    BE->>VS: Query top matching chunks (k=4)
-    VS-->>BE: Return relevant chunks + L2 distances
-    BE->>BE: Normalize distance to similarity percentage
-    BE->>BE: Inject chunks into strictly grounded System Prompt
-    BE->>AI: Call gemini-1.5-flash
-    AI-->>BE: Return factual markdown response
-    BE-->>FE: Return answer + formatted citations list
-    FE->>User: Render markdown reply + interactive citations
+    User->>FE: Ask question ("Review risks?") + Checks specific PDF
+    FE->>BE: POST /api/chat/stream { question, selected_files, history }
+    BE->>VS: Similarity Search (Callable filter for checked files)
+    VS-->>BE: Return filtered chunks + scores
+    BE-->>FE: Send 'event: sources' (SSE)
+    FE->>User: Renders grouped collapsible citations instantly
+    
+    loop Stream Generation
+        BE->>AI: Call gemini-3.5-flash with history memory
+        AI-->>BE: Stream token chunks
+        BE-->>FE: Send 'event: token' (SSE)
+        FE->>User: Renders answers word-by-word with pulsing typewriter cursor
+    end
+    BE-->>FE: Send 'event: done' (SSE)
 ```
 
 ---
 
-## 📡 API Documentation
+## 📡 Production API Documentation
 
-Interactive API documentation is auto-generated by FastAPI at:
-- **Swagger UI**: `http://127.0.0.1:8000/docs`
-- **ReDoc**: `http://127.0.0.1:8000/redoc`
+FastAPI automatically generates interactive schema specs at:
+- **Swagger UI**: `/docs`
+- **ReDoc**: `/redoc`
 
-### Core Endpoints:
+### Main Endpoints:
 
-1. `POST /api/upload`
-   - **Payload**: `multipart/form-data` containing `file` (PDF)
-   - **Response**: `{ message: str, filename: str, chunksCount: int, fileSize: int }`
+- `POST /api/chat/stream`
+  - **Payload**: `{ question: str, selected_files: Optional[List[str]], history: Optional[List[MessageParam]] }`
+  - **Content-Type**: `application/json`
+  - **Returns**: `text/event-stream` (SSE Events: `sources`, `token`, `done`)
 
-2. `GET /api/documents`
-   - **Response**: `List[{ fileName: str, fileSize: int, chunksCount: int }]`
-
-3. `POST /api/summarize`
-   - **Payload**: `{ fileName: str }`
-   - **Response**: `{ summary: str }`
-
-4. `POST /api/chat`
-   - **Payload**: `{ question: str }`
-   - **Response**: `{ answer: str, sources: List[{ text: str, document_name: str, page: int, similarity_score: float }] }`
-
-5. `POST /api/clear`
-   - **Response**: `{ message: str }`
+- `POST /api/upload`
+  - **Payload**: `multipart/form-data` (up to 100MB PDF)
+  - **Returns**: Index metrics (chunk count, size)
 
 ---
 
-## 🚀 Setup & Installation
+## 🚀 Production Deployment Specifications
 
-### Prerequisites:
-- **Node.js**: `v18+` and `npm`
-- **Python**: `v3.10` through `v3.13`
-- **Gemini API Key**: Acquire from [Google AI Studio](https://aistudio.google.com/)
+### 1. Backend: Deploying to Render / Railway
+Render and Railway deploy directly from the provided `backend/Dockerfile` and `backend/render.yaml` spec.
 
-### 1. Backend Setup:
+#### Render.com Steps:
+1. In Render Dashboard, click **New ➔ Blueprint**.
+2. Connect this GitHub repository. Render will automatically parse the `backend/render.yaml` configuration.
+3. It mounts a **Persistent Disk** under `/app/data` to ensure your FAISS vector database persists safely across container restarts.
+4. Input your `GEMINI_API_KEY` in the Environment Variables UI.
+5. Deploy.
+
+### 2. Frontend: Deploying to Vercel
+The frontend is configured with Vercel redirects inside `frontend/vercel.json` to handle React client-side route rewrites cleanly.
+
+#### Vercel Steps:
+1. In Vercel, click **New Project** and connect your repository.
+2. Set the root directory to `frontend`.
+3. Set the **Environment Variable** `VITE_API_URL` to your live Render backend URL:
+   `VITE_API_URL=https://lemon-studio-rag-backend.onrender.com`
+4. Deploy.
+
+---
+
+## 🛠️ Local Development & Quick Start
+
+### 1. Backend:
 ```bash
-# Navigate to the backend directory
 cd backend
-
-# Create a virtual environment
 python3 -m venv venv
-
-# Activate the virtual environment
-source venv/bin/activate  # On Windows, use: venv\Scripts\activate
-
-# Install requirements
+source venv/bin/activate
 pip install -r requirements.txt
-```
-
-Verify your `.env` configuration file exists inside the `backend/` directory:
-```env
-GEMINI_API_KEY=your_actual_api_key_here
-```
-
-Start the FastAPI application:
-```bash
+cp .env.example .env # Paste your GEMINI_API_KEY
 python3 -m backend.main
-# Server starts at http://127.0.0.1:8000
 ```
 
-### 2. Frontend Setup:
+### 2. Frontend:
 ```bash
-# Open a new terminal tab and navigate to the frontend directory
 cd frontend
-
-# Install package dependencies
 npm install
-
-# Launch Vite development server
 npm run dev
-# App will run at http://localhost:5173
 ```
-
-Vite is configured with a reverse-proxy setting in `vite.config.js`. It will forward `/api` requests directly to `http://127.0.0.1:8000/api` seamlessly.
-
----
-
-## 🛠️ Verification Tests
-
-### Automated Endpoint Verification:
-You can quickly check backend readiness using `curl`:
-
-- **Health check**:
-  ```bash
-  curl http://127.0.0.1:8000/api/health
-  ```
-- **Fetch indexed documents list**:
-  ```bash
-  curl http://127.0.0.1:8000/api/documents
-  ```
-
----
-
-## 🔮 Future Enhancements & Enterprise Roadmap
-
-- **Advanced Chunking Strategy**: Introduce semantic-header-aware parent-child chunk retrievers to retain structural hierarchy in extremely large corporate handbooks.
-- **Hybrid Search Capabilities**: Merge dense vector retrievals (FAISS) with sparse lexical keywords (BM25) to cover exact technical terms.
-- **Reranking Layer**: Integrate a Cohere/Cross-Encoder reranking model to score retrieved context relevance prior to feeding it to the LLM.
-- **Multi-modal Processing**: Enable layout-aware document extraction (using Gemini Flash's multi-modal capabilities) to extract charts, graphs, and images from executive presentations.
+Vite forwards all `/api` requests seamlessly using reverse proxies to the local backend port.

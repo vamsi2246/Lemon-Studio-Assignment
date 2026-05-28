@@ -1,0 +1,20 @@
+# =========================================================================
+# Render.com Production Service Specification (render.yaml)
+# =========================================================================
+services:
+  - type: web
+    name: lemon-studio-rag-backend
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    plan: free # Standard free tier compatible
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # User will paste their key in Render UI
+      - key: PORT
+        value: 8000
+    # Mount persistent disk so FAISS vector store is retained across redeployments
+    disk:
+      name: faiss-storage
+      mountPath: /app/data
+      sizeGB: 1
