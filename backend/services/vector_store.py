@@ -89,10 +89,11 @@ def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_siz
     
     return len(chunks)
 
-def similarity_search_in_store(query: str, k: int = 4) -> List[Dict[str, Any]]:
+def similarity_search_in_store(query: str, k: int = 4, selected_files: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """
     Performs similarity search in the FAISS index.
     Returns chunks with document metadata and normalized similarity scores.
+    Can filter results based on selected_files list.
     """
     if not os.path.exists(FAISS_INDEX_PATH) or not os.path.exists(os.path.join(FAISS_INDEX_PATH, "index.faiss")):
         logger.warning("FAISS index does not exist. No documents searched.")
@@ -106,8 +107,14 @@ def similarity_search_in_store(query: str, k: int = 4) -> List[Dict[str, Any]]:
             allow_dangerous_deserialization=True
         )
         
+        # Prepare callable filter if selected_files list is defined
+        search_filter = None
+        if selected_files:
+            search_filter = lambda m: m.get("source") in selected_files
+            logger.info(f"Filtering search with selected files: {selected_files}")
+            
         # similarity_search_with_score returns Tuple[Document, float] where float is L2 distance
-        results_with_scores = vector_store.similarity_search_with_score(query, k=k)
+        results_with_scores = vector_store.similarity_search_with_score(query, k=k, filter=search_filter)
         
         formatted_results = []
         for doc, distance in results_with_scores:

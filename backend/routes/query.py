@@ -12,10 +12,11 @@ async def chat_with_docs(request: QueryRequest):
     """
     RAG Endpoint. Processes the user question, retrieves relevant vector chunks
     from the FAISS index, and generates a context-grounded response.
+    Supports optional document selection filtering.
     """
     try:
-        logger.info(f"Received chat request: {request.question}")
-        response = generate_rag_response(request.question)
+        logger.info(f"Received chat request: {request.question} (filters: {request.selected_files})")
+        response = generate_rag_response(request.question, selected_files=request.selected_files)
         return response
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")

@@ -15,6 +15,7 @@ const Home = () => {
 
   // ─── Document State ───────────────────────────────
   const [documents, setDocuments] = useState([]);
+  const [selectedDocs, setSelectedDocs] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
 
   // ─── Chat State ───────────────────────────────────
@@ -31,6 +32,18 @@ const Home = () => {
       setActiveId(conversations[0].id);
     }
   }, []);
+
+  // ─── Auto-select newly uploaded documents ──────────
+  useEffect(() => {
+    setSelectedDocs((prev) => {
+      const docNames = documents.map((d) => d.fileName);
+      // Retain previously selected documents that are still in the current indexed list
+      const stillExisting = prev.filter((name) => docNames.includes(name));
+      // Auto-select any newly ingested documents
+      const newlyAdded = docNames.filter((name) => !prev.includes(name));
+      return [...stillExisting, ...newlyAdded];
+    });
+  }, [documents]);
 
   // ─── Active Conversation Helper ───────────────────
   const activeConv = conversations.find((c) => c.id === activeId) || conversations[0];
@@ -101,6 +114,7 @@ const Home = () => {
       setLoadingDocs(true);
       await API.post("/clear");
       setDocuments([]);
+      setSelectedDocs([]);
     } catch (error) {
       console.error("Error clearing index:", error);
     } finally {
@@ -122,7 +136,26 @@ const Home = () => {
         );
       }
 
-      const res = await API.post("/chat", { question: text });
+      // Pass selected_files in request to filter references.
+      // If no documents are selected, warn the user.
+      if (documents.length > 0 && selectedDocs.length === 0) {
+        const warningMsg = {
+          role: "ai",
+          text: "⚠️ **No documents are active.** Please check at least one document in the sidebar registry to search or answer questions against.",
+          sources: [],
+          latency_ms: 0
+        };
+        updateActiveMessages((prev) => [...prev, warningMsg]);
+        return;
+      }
+
+      // Restrict query to selected files
+      const payload = {
+        question: text,
+        selected_files: selectedDocs.length === documents.length ? null : selectedDocs
+      };
+
+      const res = await API.post("/chat", payload);
 
       const aiMsg = {
         role: "ai",
@@ -135,7 +168,7 @@ const Home = () => {
       console.error("RAG pipeline failure:", error);
       const errorMsg = {
         role: "ai",
-        text: `**Error**: ${error.response?.data?.detail || "Failed to reach the AI server."}`,
+        text: `**Error**: ${error.response?.data?.detail || "Failed to generate RAG response."}`,
         sources: [],
       };
       updateActiveMessages((prev) => [...prev, errorMsg]);
@@ -185,6 +218,8 @@ const Home = () => {
         <div className="shrink-0 h-full" style={{ width: sidebarWidth }}>
           <Sidebar
             documents={documents}
+            selectedDocs={selectedDocs}
+            setSelectedDocs={setSelectedDocs}
             onUploadSuccess={handleUploadSuccess}
             onClearDocuments={handleClearDocuments}
             loadingDocuments={loadingDocs}
@@ -211,6 +246,8 @@ const Home = () => {
             onNewChat={handleNewChat}
             loading={loading}
             conversationTitle={activeConv?.title}
+            hasDocuments={documents.length > 0}
+            activeDocsCount={selectedDocs.length}
           />
         </div>
       </div>

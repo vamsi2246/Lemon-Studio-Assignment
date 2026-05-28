@@ -1,8 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Terminal, ShieldAlert, BookOpen, MessageSquareDashed, Plus, Eraser, Clock } from "lucide-react";
+import { Send, Sparkles, Terminal, ShieldAlert, BookOpen, MessageSquareDashed, Plus, Eraser, Clock, Layers } from "lucide-react";
 import Message from "./Message";
 
-const Chat = ({ messages, onSendMessage, onClearConversation, onNewChat, loading, conversationTitle }) => {
+const Chat = ({
+  messages,
+  onSendMessage,
+  onClearConversation,
+  onNewChat,
+  loading,
+  conversationTitle,
+  hasDocuments,
+  activeDocsCount
+}) => {
   const [question, setQuestion] = useState("");
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -41,16 +50,34 @@ const Chat = ({ messages, onSendMessage, onClearConversation, onNewChat, loading
   ];
 
   return (
-    <div className="flex flex-col h-full glass-panel rounded-2xl border-zinc-800/80 overflow-hidden">
+    <div className="flex flex-col h-full glass-panel rounded-2xl border-zinc-800/80 overflow-hidden border">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-900/80 bg-zinc-950/30 shrink-0">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-900/80 bg-zinc-950/30 shrink-0">
         <div className="flex items-center space-x-2.5 min-w-0">
           <MessageSquareDashed className="h-4.5 w-4.5 text-blue-400 shrink-0" />
           <div className="min-w-0">
-            <h3 className="text-sm font-bold text-zinc-100 truncate max-w-[300px]">
+            <h3 className="text-sm font-bold text-zinc-100 truncate max-w-[240px]">
               {conversationTitle || "New Chat"}
             </h3>
-            <span className="text-[10px] text-zinc-500 font-medium">Context-grounded retrieval workspace</span>
+            
+            {/* Active Document query status indicators */}
+            <div className="flex items-center gap-1.5 mt-0.5 select-none">
+              <span className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Focus:</span>
+              {!hasDocuments ? (
+                <span className="text-[9px] text-rose-450 font-bold bg-rose-950/20 border border-rose-900/30 px-1.5 py-0.2 rounded">
+                  No Knowledge base
+                </span>
+              ) : activeDocsCount === 0 ? (
+                <span className="text-[9px] text-rose-400 font-bold bg-rose-950/20 border border-rose-900/30 px-1.5 py-0.2 rounded animate-pulse">
+                  0 Docs Active (Select below)
+                </span>
+              ) : (
+                <span className="text-[9px] text-emerald-450 font-bold bg-emerald-950/20 border border-emerald-900/30 px-1.5 py-0.2 rounded flex items-center gap-1">
+                  <Layers className="h-2 w-2" />
+                  {activeDocsCount} active source{activeDocsCount > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -77,24 +104,24 @@ const Chat = ({ messages, onSendMessage, onClearConversation, onNewChat, loading
       </div>
 
       {/* ── Message Stream ── */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1 bg-zinc-950/5">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center max-w-lg mx-auto p-6">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-zinc-800 flex items-center justify-center text-blue-400 mb-5 shadow-lg">
-              <Sparkles className="h-7 w-7" />
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-zinc-800 flex items-center justify-center text-blue-400 mb-4 shadow-lg">
+              <Sparkles className="h-6 w-6" />
             </div>
-            <h4 className="text-base font-bold text-zinc-100 mb-1.5">Enterprise RAG Assistant</h4>
-            <p className="text-xs text-zinc-500 leading-relaxed mb-8 max-w-sm">
-              Upload documents in the sidebar to build your knowledge base, then use the queries below or type your own to interrogate your files.
+            <h4 className="text-sm font-bold text-zinc-150 mb-1">AI Contextual Discovery Engine</h4>
+            <p className="text-xs text-zinc-555 leading-relaxed mb-6 max-w-sm">
+              Ingest multiple PDFs in the document registry, activate specific source filters, and ask contextual questions.
             </p>
 
             <div className="w-full space-y-2.5 text-left">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Try asking</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-550 ml-1">Suggested prompts</span>
               {samplePrompts.map((prompt, idx) => (
                 <button
                   key={idx}
                   onClick={() => setQuestion(prompt.text)}
-                  className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-zinc-900 bg-zinc-950/20 hover:bg-zinc-900/40 hover:border-zinc-800 text-xs text-zinc-400 hover:text-zinc-200 transition-all duration-200 cursor-pointer text-left group"
+                  className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-zinc-900 bg-zinc-950/20 hover:bg-zinc-900/30 hover:border-zinc-850 text-xs text-zinc-400 hover:text-zinc-250 transition-all duration-200 cursor-pointer text-left group"
                 >
                   <div className="h-7 w-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 group-hover:border-zinc-700">
                     {prompt.icon}
@@ -112,23 +139,29 @@ const Chat = ({ messages, onSendMessage, onClearConversation, onNewChat, loading
           ))
         )}
 
-        {/* Typing indicator */}
+        {/* Typing indicator / Search Skeleton loader */}
         {loading && (
           <div className="msg-enter flex w-full justify-start mb-4">
-            <div className="flex items-start gap-3 max-w-[75%]">
-              <div className="h-8 w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-purple-400 shrink-0">
-                <Sparkles className="h-4 w-4 animate-pulse" />
+            <div className="flex items-start gap-2.5 max-w-[75%]">
+              <div className="h-7 w-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-purple-400 shrink-0 mt-5">
+                <Sparkles className="h-3.5 w-3.5 animate-pulse" />
               </div>
-              <div className="flex flex-col space-y-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Processing query</span>
-                <div className="glass-panel text-zinc-100 rounded-2xl rounded-tl-none px-4 py-3 border border-zinc-800/80 shadow-md">
+              <div className="flex flex-col space-y-1 min-w-[280px]">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-550">Processing RAG Query</span>
+                <div className="glass-panel text-zinc-100 rounded-2xl rounded-tl-none px-4 py-3.5 border border-zinc-800/80 shadow-md space-y-2.5 relative overflow-hidden">
                   <div className="flex items-center gap-2">
                     <div className="flex space-x-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]" />
                       <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.15s]" />
                       <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" />
                     </div>
-                    <span className="text-[10px] text-zinc-500 font-medium">Searching vectors & generating response…</span>
+                    <span className="text-[10px] text-zinc-500 font-medium font-sans">Scanning vector spaces & formulating grounded response…</span>
+                  </div>
+                  {/* Premium Skeleton loader elements */}
+                  <div className="space-y-1.5 mt-2">
+                    <div className="h-2.5 bg-zinc-800/40 rounded w-full shimmer relative overflow-hidden" />
+                    <div className="h-2.5 bg-zinc-800/40 rounded w-[92%] shimmer relative overflow-hidden" />
+                    <div className="h-2.5 bg-zinc-800/40 rounded w-[78%] shimmer relative overflow-hidden" />
                   </div>
                 </div>
               </div>
@@ -147,15 +180,21 @@ const Chat = ({ messages, onSendMessage, onClearConversation, onNewChat, loading
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask anything about your documents…"
-            disabled={loading}
+            placeholder={
+              !hasDocuments
+                ? "Please upload a document to begin querying..."
+                : activeDocsCount === 0
+                ? "Select at least one active document first!"
+                : "Ask anything about your documents…"
+            }
+            disabled={loading || !hasDocuments || activeDocsCount === 0}
             rows={1}
-            className="w-full pl-4 pr-12 py-3 bg-zinc-900/50 border border-zinc-800/80 rounded-xl focus:border-blue-500/60 focus:outline-none focus:ring-1 focus:ring-blue-500/30 text-zinc-100 text-sm placeholder-zinc-500 resize-none min-h-[46px] max-h-[140px] transition-all duration-200 disabled:opacity-50"
+            className="w-full pl-4 pr-12 py-3 bg-zinc-900/50 border border-zinc-800/80 rounded-xl focus:border-blue-500/60 focus:outline-none focus:ring-1 focus:ring-blue-500/30 text-zinc-100 text-sm placeholder-zinc-500 resize-none min-h-[46px] max-h-[140px] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
-            disabled={!question.trim() || loading}
-            className="absolute right-3 top-2.5 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white flex items-center justify-center transition-colors shadow-md disabled:shadow-none cursor-pointer"
+            disabled={!question.trim() || loading || !hasDocuments || activeDocsCount === 0}
+            className="absolute right-3 top-2.5 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-900/80 disabled:text-zinc-650 text-white flex items-center justify-center transition-colors shadow-md disabled:shadow-none cursor-pointer border border-transparent disabled:border-zinc-800/60"
           >
             <Send className="h-3.5 w-3.5" />
           </button>

@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 
 class QueryRequest(BaseModel):
     question: str = Field(..., description="The user query to retrieve context for and answer")
+    selected_files: Optional[List[str]] = Field(default=None, description="Optional list of filenames to restrict the RAG context search")
 
 class SourceCitation(BaseModel):
     text: str = Field(..., description="The text content of the retrieved chunk")

@@ -113,17 +113,11 @@ async def summarize_document(request: SummaryRequest):
                 concatenated_text += chunk[:max_chars - len(concatenated_text)]
                 break
                 
-        # 3. Call Gemini model to summarize
+        # 3. Call Gemini model to summarize using stable model lists
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
             
-        model = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
-            google_api_key=api_key,
-            temperature=0.3
-        )
-        
         system_msg = (
             "You are an elite Enterprise AI Search Assistant. Create a highly professional, "
             "executive summary of the uploaded document based on the text segments provided below.\n\n"
@@ -137,12 +131,45 @@ async def summarize_document(request: SummaryRequest):
         
         user_msg = f"Document content:\n{concatenated_text}"
         
-        response = model.invoke([
-            SystemMessage(content=system_msg),
-            HumanMessage(content=user_msg)
-        ])
+        # In May 2026, legacy models like gemini-1.5-flash are deprecated from v1beta.
+        # Prefer gemini-3.5-flash, gemini-2.5-flash, gemini-2.0-flash, gemini-flash-latest.
+        models_to_try = [
+            "models/gemini-3.5-flash",
+            "models/gemini-2.5-flash",
+            "models/gemini-2.0-flash",
+            "models/gemini-flash-latest"
+        ]
         
-        return {"summary": response.content}
+        summary_content = ""
+        last_err = None
+        
+        for model_name in models_to_try:
+            try:
+                logger.info(f"Summarizing document {request.fileName} using: {model_name}")
+                model = ChatGoogleGenerativeAI(
+                    model=model_name,
+                    google_api_key=api_key,
+                    temperature=0.3
+                )
+                
+                response = model.invoke([
+                    SystemMessage(content=system_msg),
+                    HumanMessage(content=user_msg)
+                ])
+                summary_content = response.content
+                break
+            except Exception as ex:
+                logger.warning(f"Summarization failed with model {model_name}: {ex}")
+                last_err = ex
+                continue
+                
+        if not summary_content:
+            raise HTTPException(
+                status_code=500,
+                detail=f"All summary AI models failed to process the request. Last error: {str(last_err)}"
+            )
+            
+        return {"summary": summary_content}
         
     except HTTPException as he:
         raise he

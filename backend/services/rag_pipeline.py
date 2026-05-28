@@ -1,29 +1,44 @@
 import os
 import logging
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from backend.services.vector_store import similarity_search_in_store
 
 logger = logging.getLogger(__name__)
 
-def generate_rag_response(question: str, k: int = 4) -> Dict[str, Any]:
+# List of models to try in order of preference to avoid 404 NOT_FOUND errors.
+# Google recently migrated active models, retiring legacy gemini-1.5 series in v1beta.
+# Available models: gemini-3.5-flash, gemini-2.5-flash, gemini-2.0-flash, gemini-flash-latest
+GEMINI_MODELS = [
+    "models/gemini-3.5-flash",
+    "models/gemini-2.5-flash",
+    "models/gemini-2.0-flash",
+    "models/gemini-flash-latest"
+]
+
+def generate_rag_response(
+    question: str, 
+    k: int = 4, 
+    selected_files: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """
     RAG pipeline:
-    1. Retrieval: Search FAISS for chunks similar to the question.
-    2. Grounding: Construct a context-specific system prompt.
-    3. Generation: Invoke the Gemini model to produce a hallucination-reduced response.
+    1. Retrieval: Search FAISS for chunks similar to the question, optionally filtering by selected_files list.
+    2. Grounding: Construct a context-specific system prompt with strict factual instructions.
+    3. Generation: Invoke a stable Gemini model (with fallbacks) to produce a grounded response.
     """
-    # 1. Retrieval
     start_time = time.time()
-    retrieved_chunks = similarity_search_in_store(question, k=k)
+    
+    # 1. Retrieval
+    retrieved_chunks = similarity_search_in_store(question, k=k, selected_files=selected_files)
     
     if not retrieved_chunks:
         return {
-            "answer": "Please upload one or more PDF documents first before asking questions.",
+            "answer": "No reference context was found. Please ensure you have uploaded documents and selected them as active knowledge sources.",
             "sources": [],
-            "latency_ms": 0.0
+            "latency_ms": round((time.time() - start_time) * 1000, 2)
         }
     
     # Construct context from chunks
@@ -51,40 +66,46 @@ def generate_rag_response(question: str, k: int = 4) -> Dict[str, Any]:
     
     user_prompt = f"Context:\n{context_str}\n\nQuestion:\n{question}"
     
-    # 3. Model generation
+    # 3. Model generation with fallbacks
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set")
         
-    try:
-        model = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
-            google_api_key=api_key,
-            temperature=0.2 # Lower temperature for factual retrieval
-        )
-        
-        messages = [
-            SystemMessage(content=system_instruction),
-            HumanMessage(content=user_prompt)
-        ]
-        
-        logger.info("Generating response from Gemini...")
-        response = model.invoke(messages)
-        answer = response.content
-        
-        latency_ms = (time.time() - start_time) * 1000
-        
-        return {
-            "answer": answer,
-            "sources": retrieved_chunks,
-            "latency_ms": round(latency_ms, 2)
-        }
-        
-    except Exception as e:
-        logger.error(f"Error in RAG generation: {e}")
-        latency_ms = (time.time() - start_time) * 1000
-        return {
-            "answer": f"An error occurred while generating the response: {str(e)}",
-            "sources": retrieved_chunks, # Still return retrieved sources even if LLM fails
-            "latency_ms": round(latency_ms, 2)
-        }
+    last_error = None
+    for model_name in GEMINI_MODELS:
+        try:
+            logger.info(f"Attempting to generate RAG response with model: {model_name}")
+            model = ChatGoogleGenerativeAI(
+                model=model_name,
+                google_api_key=api_key,
+                temperature=0.2
+            )
+            
+            messages = [
+                SystemMessage(content=system_instruction),
+                HumanMessage(content=user_prompt)
+            ]
+            
+            response = model.invoke(messages)
+            answer = response.content
+            
+            latency_ms = (time.time() - start_time) * 1000
+            
+            return {
+                "answer": answer,
+                "sources": retrieved_chunks,
+                "latency_ms": round(latency_ms, 2)
+            }
+        except Exception as e:
+            logger.warning(f"Failed to generate RAG response with {model_name}: {e}")
+            last_error = e
+            continue
+            
+    # If all models fail, return a elegant error explanation
+    logger.error(f"All RAG model attempts failed. Last error: {last_error}")
+    latency_ms = (time.time() - start_time) * 1000
+    return {
+        "answer": f"We encountered an issue communicating with the AI model. Please verify your API key and try again later. (Error: {str(last_error)})",
+        "sources": retrieved_chunks,
+        "latency_ms": round(latency_ms, 2)
+    }
