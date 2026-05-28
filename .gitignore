@@ -1,32 +1,71 @@
-# Dependency directories
+# =========================================================================
+# Lemon Studio Enterprise RAG Platform - Root Gitignore Specifications
+# =========================================================================
+
+# 1. Dependency & Build Directories
 node_modules/
 **/node_modules/
+dist/
+**/dist/
+dist-ssr/
+build/
+bin/
+obj/
 
-# Environment variables
+# 2. Python & Virtual Environments
+venv/
+**/venv/
+.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.poetry/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 3. Local Environment Configurations
 .env
 **/.env
+*.env.local
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Logs
+# 4. Diagnostics, Logs, & Runtimes
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.eslintcache
 
-# Operating System files
+# 5. Persistent FAISS Indices & Temporary Ingestion Storage
+# Explicitly prevent checked-in database segments or uploads
+backend/data/
+**/backend/data/
+**/data/faiss_index/
+**/data/temp_uploads/
+**/data/documents.json
+
+# 6. Operating System & IDE Configs
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-
-# Python & Virtual Environments
-**/__pycache__/
-*.pyc
-.pytest_cache/
-backend/venv/
-
-# FAISS Vector Store Indexes & Metadata logs
-backend/data/faiss_index/
-backend/data/temp_uploads/
-backend/data/documents.json
-
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
