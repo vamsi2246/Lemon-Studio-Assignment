@@ -159,29 +159,25 @@ Lemon Studio implements **production-grade AI engineering gotcha-resolvers** to 
 
 ---
 
-## 📸 Live Application Screenshots & RAG Workspaces
+## 📸 Deployed Application Screenshots & RAG Workspaces
 
-The following screenshots captured directly from the live deployed application illustrate the real dark-mode enterprise UI, multi-document ingestion flow, context-aware query workspaces, and active vector filtering:
+The following authentic screenshots captured directly from the live deployed application illustrate the real dark-mode enterprise UI, multi-document ingestion flow, context-aware query workspaces, and active vector filtering:
 
-### 🖥️ 1. Main Dashboard & Enterprise UI
-The primary command console featuring the dark-mode layout, a sidebar detailing the active document checklist, indexing metrics (total documents, pages, tokens), and the responsive chat cockpit.
+### 🖥️ 1. Main Dashboard (Initial Empty State)
+The primary command console featuring the professional dark enterprise UI, a left sidebar for dynamic knowledge base uploads and document registry logs, Suggested Prompt shortcuts in the workspace, and FAISS Engine status widgets.
 ![Main Dashboard](./screenshots/dashboard.png)
 
-### 📂 2. Multi-Document Ingestion & Registry
-Visual representation of the sequential ingestion pipeline, parsing files page-by-page, chunking them recursively, and updating the active document registry.
-![Multi-Document Ingestion](./screenshots/upload.png)
+### 📂 2. Multi-Document Upload & Ingestion
+Visual representation of the sequential ingestion pipeline after multiple corporate PDF documents (e.g. `FY2024_Financial_Report.pdf`, `Q3_Marketing_Strategy.pdf`) have been parsed page-by-page, chunked, embedded, and registered in the FAISS index.
+![Multi-Document Upload](./screenshots/upload.png)
 
-### 💬 3. AI Chat Context Workspace
-Real conversational flow demonstrating SSE-driven word-by-word streaming token responses with a typewriter cursor, context popover digests, and suggested prompts.
-![AI Chat Workspace](./screenshots/chat.png)
+### 💬 3. AI Contextual Chat Workspace
+Real conversational flow demonstrating context-aware RAG querying. The prompt targets active sources and retrieves grounded AI responses word-by-word with typewriter styling, specific inline citations (`[1, 2]`), and a typing cursor.
+![AI Context Workspace](./screenshots/chat.png)
 
-### 🎯 4. Targeted Document Retrieval & Filtering
-Demonstration of selective querying, where queries are restricted to user-checked files in the sidebar, preventing context pollution from unselected documents.
+### 🎯 4. Targeted Source Retrieval & Active Filtering
+Demonstration of selective querying where vector search is routed strictly to the checked files in the sidebar checklist, preventing context pollution. The workspace displays retrieved dense chunks grouped with source metadata, page numbers, and exact mathematical similarity indices.
 ![Targeted Document Retrieval](./screenshots/retrieval.png)
-
-### 🔍 5. Source Citations & Similarity Scores
-Granular citation panels showing the exact retrieved dense vector chunks, their page numbers, document parent nodes, and calculated L2 similarity relevance scores.
-![Source Citations](./screenshots/citation.png)
 
 ---
 
