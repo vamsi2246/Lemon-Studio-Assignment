@@ -1,8 +1,6 @@
 # 🍋 Lemon Studio — Enterprise Multi-Document RAG Platform
 
 <div align="center">
-  <img src="./frontend/src/assets/hero.png" alt="Lemon Studio Enterprise RAG banner" width="100%" style="border-radius: 8px; margin-bottom: 20px;" />
-
   <p align="center">
     <strong>A startup-quality, production-ready Multi-Document Retrieval-Augmented Generation (RAG) platform.</strong>
   </p>
@@ -161,25 +159,29 @@ Lemon Studio implements **production-grade AI engineering gotcha-resolvers** to 
 
 ---
 
-## 📸 Screenshots & UI Workspace
+## 📸 Live Application Screenshots & RAG Workspaces
 
-The following high-fidelity screenshots illustrate the premium, glassmorphic dark-mode interface, structured workspace, and advanced RAG retrieval diagnostics engineered within **Lemon Studio**:
+The following screenshots captured directly from the live deployed application illustrate the real dark-mode enterprise UI, multi-document ingestion flow, context-aware query workspaces, and active vector filtering:
 
-### 🖥️ 1. Enterprise Dashboard Cockpit
-The core command console features an elite left sidebar showcasing dynamic file selectors, real-time ingestion status indicators, active document statistics, and an elegant drag-and-drop zone.
-![Enterprise Dashboard Cockpit](./screenshots/dashboard.png)
+### 🖥️ 1. Main Dashboard & Enterprise UI
+The primary command console featuring the dark-mode layout, a sidebar detailing the active document checklist, indexing metrics (total documents, pages, tokens), and the responsive chat cockpit.
+![Main Dashboard](./screenshots/dashboard.png)
 
-### 📂 2. Sequential Ingestion Progress
-Large corporate manuals are uploaded sequentially, complete with percentage progress trackers, extraction metrics, and background indexation status lights.
-![Ingestion In Progress](./screenshots/upload_workflow.png)
+### 📂 2. Multi-Document Ingestion & Registry
+Visual representation of the sequential ingestion pipeline, parsing files page-by-page, chunking them recursively, and updating the active document registry.
+![Multi-Document Ingestion](./screenshots/upload.png)
 
-### 💬 3. Conversational AI Workspace
-User queries stream grounded, context-rich responses word-by-word with typewriter styling, collapsible digests, and suggested prompt shortcuts.
-![Conversational AI Workspace](./screenshots/workspace.png)
+### 💬 3. AI Chat Context Workspace
+Real conversational flow demonstrating SSE-driven word-by-word streaming token responses with a typewriter cursor, context popover digests, and suggested prompts.
+![AI Chat Workspace](./screenshots/chat.png)
 
-### 🔍 4. Semantic Citations & Match Scores
-Retrieved dense vector chunks are grouped under interactive, collapsible document parent files. Page locations and exact mathematical similarity indices are mapped out with pixel-perfect clarity.
-![Semantic Citations and Scores](./screenshots/retrieval_results.png)
+### 🎯 4. Targeted Document Retrieval & Filtering
+Demonstration of selective querying, where queries are restricted to user-checked files in the sidebar, preventing context pollution from unselected documents.
+![Targeted Document Retrieval](./screenshots/retrieval.png)
+
+### 🔍 5. Source Citations & Similarity Scores
+Granular citation panels showing the exact retrieved dense vector chunks, their page numbers, document parent nodes, and calculated L2 similarity relevance scores.
+![Source Citations](./screenshots/citation.png)
 
 ---
 
