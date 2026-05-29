@@ -86,6 +86,14 @@ from backend.routes.query import router as query_router
 app.include_router(upload_router)
 app.include_router(query_router)
 
+# Validate embedding model connectivity at startup
+# This catches API key issues and deprecated model errors immediately
+from backend.services.embeddings import validate_embeddings_on_startup
+try:
+    validate_embeddings_on_startup()
+except Exception as e:
+    logger.error(f"Embedding startup validation error: {e}")
+
 @app.get("/")
 @app.head("/")
 async def root_welcome():
