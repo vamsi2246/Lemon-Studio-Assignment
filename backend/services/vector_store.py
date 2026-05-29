@@ -67,15 +67,18 @@ def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_siz
         for chunk in chunks
     ]
     
-    # Large files can produce hundreds of chunks, exceeding Gemini embedding minute quotas.
-    # We batch the documents to avoid overloading, and implement retry logic on 429 errors.
-    batch_size = 30
+    # Large files can produce hundreds of chunks, exceeding Gemini embedding free-tier quotas.
+    # Gemini free tier allows ~15 embedding requests/min. We use very small batches
+    # with exponential backoff and inter-batch cooldowns to stay within limits.
+    batch_size = 5  # Small batches to avoid 429 RESOURCE_EXHAUSTED on free tier
     total_docs = len(documents)
-    logger.info(f"Indexing '{doc_name}' ({total_docs} chunks total) in batches of {batch_size}...")
+    total_batches = (total_docs + batch_size - 1) // batch_size
+    logger.info(f"Indexing '{doc_name}' ({total_docs} chunks total) in {total_batches} batches of {batch_size}...")
     
     for idx in range(0, total_docs, batch_size):
         batch = documents[idx:idx+batch_size]
-        max_retries = 5
+        batch_num = idx // batch_size + 1
+        max_retries = 8  # More retries for free-tier resilience
         
         for attempt in range(max_retries):
             try:
@@ -86,10 +89,10 @@ def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_siz
                 )
                 
                 if not index_exists and idx == 0:
-                    logger.info(f"Creating new FAISS index with batch {idx // batch_size + 1}...")
+                    logger.info(f"Creating new FAISS index with batch {batch_num}/{total_batches}...")
                     vector_store = FAISS.from_documents(batch, embeddings_model)
                 else:
-                    logger.info(f"Appending batch {idx // batch_size + 1} to existing FAISS index...")
+                    logger.info(f"Appending batch {batch_num}/{total_batches} to existing FAISS index...")
                     vector_store = FAISS.load_local(
                         FAISS_INDEX_PATH, 
                         embeddings_model, 
@@ -99,23 +102,31 @@ def add_documents_to_store(chunks: List[Dict[str, Any]], doc_name: str, file_siz
                 
                 # Save immediately to disk
                 vector_store.save_local(FAISS_INDEX_PATH)
+                
+                # Inter-batch cooldown to prevent burst-triggering rate limits
+                if idx + batch_size < total_docs:
+                    logger.info(f"Batch {batch_num}/{total_batches} indexed. Cooling down 2s...")
+                    time.sleep(2)
+                    
                 break # Success! Break the retry loop for this batch.
                 
             except Exception as e:
                 # Catch Resource Exhausted (429) rate limit issues
                 err_msg = str(e)
-                if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                    sleep_duration = (attempt + 1) * 4
+                if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "quota" in err_msg.lower():
+                    # Exponential backoff: 5s, 10s, 20s, 40s, 60s, 60s, 60s, 120s
+                    sleep_duration = min(120, 5 * (2 ** attempt))
                     logger.warning(
-                        f"Gemini Rate Limit (429) encountered. Attempt {attempt + 1}/{max_retries}. "
-                        f"Sleeping for {sleep_duration}s before retry..."
+                        f"Gemini Rate Limit (429) on batch {batch_num}/{total_batches}. "
+                        f"Attempt {attempt + 1}/{max_retries}. "
+                        f"Sleeping {sleep_duration}s before retry..."
                     )
                     time.sleep(sleep_duration)
                 else:
-                    logger.error(f"Failed to process batch {idx // batch_size + 1}: {e}", exc_info=True)
+                    logger.error(f"Failed to process batch {batch_num}/{total_batches}: {e}", exc_info=True)
                     raise e
         else:
-            raise RuntimeError(f"Failed to index batch {idx // batch_size + 1} after {max_retries} rate-limit retries.")
+            raise RuntimeError(f"Failed to index batch {batch_num}/{total_batches} after {max_retries} rate-limit retries.")
             
     # Update documents metadata
     meta_list = load_documents_metadata()
