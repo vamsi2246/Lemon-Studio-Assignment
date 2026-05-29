@@ -1,65 +1,39 @@
-# 📄 Subjective Round — Assignment Answers
+Q1. Explain the difference between a traditional keyword-based search system and a Retrieval-Augmented Generation (RAG) system. Where would you prefer using RAG over a normal search pipeline?
 
-> **Candidate**: Vamsi Kummara  
-> **Project**: Lemon Studio — Enterprise Multi-Document RAG Assistant
+A1. Traditional keyword-based search works by matching exact words from the user's query against stored documents. It's fast and simple but fails when the user uses different wording than what's in the document. For example, searching "employee benefits" won't match a document that says "staff compensation package."
 
----
+RAG works differently. It first converts text into vector embeddings that capture meaning, stores them in a vector database like FAISS, and retrieves the most semantically relevant chunks when a user asks a question. These retrieved chunks are then passed as context to an LLM, which generates a grounded answer based on actual document content.
 
-## Q1. Explain the difference between a traditional keyword-based search system and a Retrieval-Augmented Generation (RAG) system. Where would you prefer using RAG over a normal search pipeline?
+I would prefer RAG over normal search when working with enterprise knowledge bases, internal documentation, legal contracts, or any scenario where users ask natural language questions and expect synthesized answers instead of just a list of matching documents. RAG also helps reduce hallucinations since the model's response is grounded in real retrieved content.
 
-Traditional keyword-based search works by matching exact words or phrases from a user's query against an index of documents. It's fast, predictable, and easy to implement — but it has a fundamental limitation: it doesn't understand meaning. If a user searches for "employee benefits" but the document says "staff compensation package," a keyword search will miss it entirely.
 
-RAG takes a fundamentally different approach. It converts both the user's query and document chunks into dense vector embeddings that capture semantic meaning, not just surface-level words. When a user asks a question, the system retrieves the most semantically relevant chunks from a vector database (like FAISS), then passes them as context to a Large Language Model which generates a coherent, grounded answer.
+Q2. Suppose you are integrating an LLM into an existing workflow automation system. What factors would you consider before deploying it into production?
 
-The key difference is that keyword search returns a list of matching documents and leaves interpretation to the user, while RAG actually synthesizes an answer from the retrieved context.
+A2. Before deploying an LLM into production, I would consider these key factors:
 
-I would prefer RAG over traditional search in scenarios where:
+Hallucination control - LLMs can generate confident but incorrect answers. Using RAG or grounding techniques helps keep responses factual. Adding system prompts that instruct the model to say "I don't know" when context is missing also helps.
 
-- **Enterprise knowledge bases** — employees need precise answers from hundreds of internal PDFs, not a list of links
-- **Customer support systems** — where natural language questions need direct answers
-- **Research and legal document analysis** — where understanding context across multiple documents matters more than exact matches
-- **Any domain where users ask questions in natural language** and expect synthesized, readable answers rather than raw search results
+Security and privacy - If the system handles sensitive data, we need to make sure user inputs and documents are not leaked through API calls. Proper access controls and data encryption are essential.
 
-RAG isn't always better — for simple lookups or structured data queries, keyword search is faster and cheaper. But when semantic understanding matters, RAG is clearly the stronger choice.
+Latency - Users expect fast responses. Using streaming (SSE), caching frequent queries, and picking the right model size for the task helps keep response times low.
 
----
+Cost - LLM API calls can get expensive at scale. Monitoring token usage, setting rate limits, and using smaller models for simpler tasks helps manage costs.
 
-## Q2. Suppose you are integrating an LLM into an existing workflow automation system. What factors would you consider before deploying it into production?
+Scalability - The system should handle growing traffic. This means proper load balancing, async processing, and potentially moving to managed vector databases.
 
-Deploying an LLM into production is very different from getting it to work in a demo. Here are the key factors I'd consider:
+Monitoring - After deployment, we need logging, error tracking, and user feedback loops to catch issues early and improve the system over time.
 
-**Hallucination Control:** This is the biggest risk. LLMs can confidently generate incorrect information that looks perfectly legitimate. In production, I'd implement grounding techniques like RAG to anchor responses in real data, add explicit system prompts that instruct the model to refuse answering when context is insufficient, and build validation layers to catch obviously wrong outputs.
 
-**Security & Privacy:** If the system handles sensitive data — customer records, financial documents, internal reports — you need strict controls. This includes ensuring data isn't leaked through API calls, implementing proper access controls, and making sure uploaded content is stored securely. In regulated industries, you may also need audit trails of every LLM interaction.
+Q3. Describe a technical project where you built or contributed to a software application. What challenges did you face and how did you solve them?
 
-**Latency & Performance:** Users won't wait 15 seconds for an answer. I'd optimize by caching frequent queries, using streaming responses so users see partial results immediately, choosing the right model size (smaller models for simpler tasks), and implementing request queuing to handle concurrent users.
+A3. I built an Enterprise Multi-Document RAG Assistant called Lemon Studio using React, FastAPI, FAISS, LangChain, and Google Gemini API.
 
-**Cost Management:** LLM API calls add up quickly at scale. Monitoring token usage per request, setting rate limits, batching where possible, and choosing cost-effective models for non-critical tasks are all essential. Running cost projections before launch prevents budget surprises.
+The objective was to let users upload multiple PDF documents, search across them semantically, and get AI-generated answers grounded in the actual document content. The frontend was built with React and Tailwind CSS, and the backend used FastAPI with FAISS as the vector store.
 
-**Scalability & Monitoring:** The system needs to handle growing traffic without breaking. This means implementing proper logging, tracking error rates, monitoring response quality over time, and setting up alerts for failures. Post-deployment, regular evaluation of response accuracy helps catch model drift or degradation.
+The workflow is: PDFs get uploaded, parsed page-by-page using PyPDF, split into chunks with overlap, embedded using Gemini's embedding model, and stored in FAISS. When a user asks a question, the system finds the most relevant chunks through similarity search, passes them as context to Gemini, and streams the response back in real-time using Server-Sent Events.
 
-Without addressing these factors upfront, even a technically impressive LLM integration can become a production liability.
+One challenge I faced was retrieval quality when multiple documents were uploaded. Unrelated chunks from other documents were polluting the context. I solved this by implementing document-targeted query routing and metadata filtering, so the search only looks at relevant files based on what the user is asking about.
 
----
+Another challenge was production deployment issues. The embedding model I was using (text-embedding-004) got deprecated and started returning 404 errors. I had to migrate to gemini-embedding-001 and rebuild the entire vector index. I also hit rate limiting issues with the free tier API when processing large PDFs, which I fixed by reducing batch sizes and adding exponential backoff with retries.
 
-## Q3. Describe a technical project where you built or contributed to a software application. What challenges did you face and how did you solve them?
-
-### Project: Lemon Studio — Enterprise Multi-Document RAG Assistant
-
-I built an enterprise-grade multi-document Retrieval-Augmented Generation platform that allows users to upload multiple PDF documents, semantically search across them, and ask contextual questions with AI-generated grounded responses.
-
-**Tech Stack:** React (frontend), FastAPI (backend), FAISS (vector store), LangChain (orchestration), Google Gemini API (embeddings + generation), deployed on Vercel (frontend) and Render (backend with persistent disk).
-
-**Architecture:** The system follows a clean pipeline architecture. PDFs are uploaded through the React frontend, parsed and chunked on the backend using sentence-aware splitting, embedded using Gemini's embedding model, and stored in a FAISS vector index on persistent storage. When a user asks a question, the system performs similarity search with metadata filtering, retrieves the top relevant chunks, and passes them as context to Gemini for response generation — with streaming support for real-time token delivery.
-
-**Challenges & Solutions:**
-
-The biggest challenge was **retrieval quality with multiple documents**. Initially, when several PDFs were uploaded, the FAISS search would return irrelevant chunks from unrelated documents. I solved this by implementing a hybrid retrieval strategy — combining query routing (detecting which documents the user is asking about), metadata-aware filtering (using normalized filename matching), and similarity score thresholding to discard weak matches.
-
-Another significant challenge was **production deployment stability**. The Gemini embedding model I was originally using (`text-embedding-004`) got retired mid-development, causing 404 errors in production. I had to quickly migrate to `gemini-embedding-001`, rebuild the vector index, and implement proper startup validation that catches API issues immediately on server boot. I also ran into rate-limiting issues with the free-tier API — larger PDFs with 40+ chunks would exhaust the quota. I fixed this by reducing batch sizes, implementing exponential backoff with up to 8 retries, and adding inter-batch cooldowns.
-
-**Learnings:** This project gave me hands-on experience with the full RAG lifecycle — from document ingestion and chunking strategies to vector search tuning and production deployment debugging. I learned that building a working demo is easy, but making it reliable in production requires careful error handling, API resilience, and constant iteration on retrieval quality.
-
----
-
-*Last updated: May 2026*
+Through this project I learned how RAG systems actually work end-to-end, how to handle real production issues like API deprecation and rate limiting, and how important retrieval quality tuning is for getting good answers from the LLM.
