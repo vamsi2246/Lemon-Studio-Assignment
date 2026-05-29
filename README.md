@@ -323,6 +323,17 @@ FastAPI automatically generates interactive Swagger schema specifications at `/d
 
 ---
 
+## 📋 Assignment Responses
+
+Complete written responses for the MCQ and Subjective evaluation rounds:
+
+| Round | Document | Description |
+|-------|----------|-------------|
+| **MCQ Round** | [📝 MCQ_Answers.md](./docs/MCQ_Answers.md) | All 5 MCQ questions with correct answers and concise explanations |
+| **Subjective Round** | [📄 Subjective_Answers.md](./docs/Subjective_Answers.md) | 3 detailed subjective responses covering RAG vs keyword search, LLM deployment factors, and project deep-dive |
+
+---
+
 ## 🔮 Future Production Roadmap
 
 To scale this platform to enterprise scale, the following architectural enhancements are planned:
