@@ -1,4 +1,4 @@
-# 🍋 Lemon Studio — Enterprise Multi-Document RAG Platform
+#  Lemon Studio — Enterprise Multi-Document RAG Platform
 
 <div align="center">
   <p align="center">
